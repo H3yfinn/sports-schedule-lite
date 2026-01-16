@@ -5,6 +5,8 @@
   "description": "Static LoL esports schedule viewer",
   "scripts": {
     "dev": "npx http-server -c-1 -p 5173 -o",
-    "start": "npx http-server -c-1 -p 5173 -o"
+    "start": "npx http-server -c-1 -p 5173 -o",
+    "test": "node tests/smoke.test.mjs",
+    "test:e2e": "node tests/smoke.test.mjs"
   }
 }

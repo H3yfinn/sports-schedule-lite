@@ -2,51 +2,140 @@ const API_BASE = "https://api.lol-esports.mckernant1.com";
 const PRIORITY_EVENT_IDS = ["MSI", "WCS", "FST", "FS"];
 const MAJOR_LEAGUE_IDS = ["LCK", "LEC", "LPL", "LCS"];
 const STREAMS_BY_LEAGUE_ID = {
-  LCK: "https://www.youtube.com/@LCKglobal/live",
-  LEC: "https://www.youtube.com/@LEC/live",
-  LPL: "https://www.youtube.com/@lplenglish/live",
-  LCS: "https://www.youtube.com/@LCS/live",
-  MSI: "https://www.youtube.com/@lolesports/live",
-  WCS: "https://www.youtube.com/@lolesports/live",
-  FST: "https://www.youtube.com/@lolesports/live",
-  FS: "https://www.youtube.com/@lolesports/live",
+  LCK: {
+    official: "https://www.youtube.com/@LCKglobal/live",
+    coStream: "https://www.twitch.tv/caedrel",
+  },
+  LEC: {
+    official: "https://www.youtube.com/@LEC/live",
+    coStream: "https://www.twitch.tv/caedrel",
+  },
+  LPL: {
+    official: "https://www.youtube.com/@lplenglish/live",
+  },
+  LCS: {
+    official: "https://www.youtube.com/@LCS/live",
+  },
+  MSI: {
+    official: "https://www.youtube.com/@lolesports/live",
+    coStream: "https://www.twitch.tv/caedrel",
+  },
+  WCS: {
+    official: "https://www.youtube.com/@lolesports/live",
+  },
+  FST: {
+    official: "https://www.youtube.com/@lolesports/live",
+  },
+  FS: {
+    official: "https://www.youtube.com/@lolesports/live",
+  },
 };
 const TEAM_LOGO_BASE = "https://static.lolesports.com/teams/";
+const LOCAL_LOGO_BASE = "assets/logos/";
 const TEAM_BRAND_MAP = {
-  T1: { color: "#C8102E" },
-  GEN: { color: "#AF8B4C" },
-  DK: { color: "#0A1A3F" },
-  HLE: { color: "#F37021" },
-  KT: { color: "#E2231A" },
-  DRX: { color: "#1E5AA8" },
-  KDF: { color: "#1E73BE" },
-  NS: { color: "#5B5B5B" },
-  BRO: { color: "#1B5C2E" },
-  G2: { color: "#C9A63B" },
-  FNC: { color: "#FF6A00" },
-  MDK: { color: "#E11D48" },
-  MAD: { color: "#E11D48" },
-  BDS: { color: "#0D47A1" },
-  VIT: { color: "#F2E74B" },
-  SK: { color: "#C00000" },
-  TH: { color: "#7A5CFF" },
-  GX: { color: "#191970" },
-  KC: { color: "#1F6FEB" },
+  T1: { color: "#C8102E", logoUrl: `${LOCAL_LOGO_BASE}T1.svg` },
+  GEN: { color: "#AF8B4C", logoUrl: `${LOCAL_LOGO_BASE}GEN.svg` },
+  DK: { color: "#0A1A3F", logoUrl: `${LOCAL_LOGO_BASE}DK.svg` },
+  HLE: { color: "#F37021", logoUrl: `${LOCAL_LOGO_BASE}HLE.svg` },
+  KT: { color: "#E2231A", logoUrl: `${LOCAL_LOGO_BASE}KT.svg` },
+  DRX: { color: "#1E5AA8", logoUrl: `${LOCAL_LOGO_BASE}DRX.svg` },
+  KDF: { color: "#1E73BE", logoUrl: `${LOCAL_LOGO_BASE}KDF.svg` },
+  NS: { color: "#5B5B5B", logoUrl: `${LOCAL_LOGO_BASE}NS.svg` },
+  BRO: { color: "#1B5C2E", logoUrl: `${LOCAL_LOGO_BASE}BRO.svg` },
+  FOX: { color: "#111111", logoUrl: `${LOCAL_LOGO_BASE}FOX.svg` },
+  G2: { color: "#C9A63B", logoUrl: `${LOCAL_LOGO_BASE}G2.svg` },
+  FNC: { color: "#FF6A00", logoUrl: `${LOCAL_LOGO_BASE}FNC.svg` },
+  MDK: { color: "#E11D48", logoUrl: `${LOCAL_LOGO_BASE}MDK.svg` },
+  MAD: { color: "#E11D48", logoUrl: `${LOCAL_LOGO_BASE}MDK.svg` },
+  BDS: { color: "#0D47A1", logoUrl: `${LOCAL_LOGO_BASE}BDS.svg` },
+  VIT: { color: "#F2E74B", logoUrl: `${LOCAL_LOGO_BASE}VIT.svg` },
+  SK: { color: "#C00000", logoUrl: `${LOCAL_LOGO_BASE}SK.svg` },
+  TH: { color: "#7A5CFF", logoUrl: `${LOCAL_LOGO_BASE}TH.svg` },
+  GX: { color: "#191970", logoUrl: `${LOCAL_LOGO_BASE}GX.svg` },
+  KC: { color: "#1F6FEB", logoUrl: `${LOCAL_LOGO_BASE}KC.svg` },
+  RGE: { color: "#111827", logoUrl: `${LOCAL_LOGO_BASE}RGE.svg` },
   TL: { color: "#001C3D" },
   C9: { color: "#6AAFE6" },
   "100": { color: "#DBB25F" },
   FLY: { color: "#00C2A8" },
   NRG: { color: "#111111" },
-  TES: { color: "#0077C8" },
-  JDG: { color: "#D4AF37" },
-  BLG: { color: "#0084FF" },
-  LNG: { color: "#00C7B7" },
-  WBG: { color: "#D71920" },
-  EDG: { color: "#002A5C" },
-  RNG: { color: "#D40000" },
-  IG: { color: "#0B1F2A" },
+  TES: { color: "#0077C8", logoUrl: `${LOCAL_LOGO_BASE}TES.svg` },
+  JDG: { color: "#D4AF37", logoUrl: `${LOCAL_LOGO_BASE}JDG.svg` },
+  BLG: { color: "#0084FF", logoUrl: `${LOCAL_LOGO_BASE}BLG.svg` },
+  LNG: { color: "#00C7B7", logoUrl: `${LOCAL_LOGO_BASE}LNG.svg` },
+  WBG: { color: "#D71920", logoUrl: `${LOCAL_LOGO_BASE}WBG.svg` },
+  EDG: { color: "#002A5C", logoUrl: `${LOCAL_LOGO_BASE}EDG.svg` },
+  RNG: { color: "#D40000", logoUrl: `${LOCAL_LOGO_BASE}RNG.svg` },
+  IG: { color: "#0B1F2A", logoUrl: `${LOCAL_LOGO_BASE}IG.svg` },
+  FPX: { color: "#E10600", logoUrl: `${LOCAL_LOGO_BASE}FPX.svg` },
+  OMG: { color: "#111111", logoUrl: `${LOCAL_LOGO_BASE}OMG.svg` },
+  NIP: { color: "#7C3AED", logoUrl: `${LOCAL_LOGO_BASE}NIP.svg` },
+  WE: { color: "#B91C1C", logoUrl: `${LOCAL_LOGO_BASE}WE.svg` },
+  LGD: { color: "#2563EB", logoUrl: `${LOCAL_LOGO_BASE}LGD.svg` },
+  AL: { color: "#0F766E", logoUrl: `${LOCAL_LOGO_BASE}AL.svg` },
+  RA: { color: "#F97316", logoUrl: `${LOCAL_LOGO_BASE}RA.svg` },
+  TT: { color: "#2563EB", logoUrl: `${LOCAL_LOGO_BASE}TT.svg` },
+  UP: { color: "#14B8A6", logoUrl: `${LOCAL_LOGO_BASE}UP.svg` },
 };
-const CORS_PROXY = "https://corsproxy.io/?";
+const TEAM_ID_ALIASES = {
+  DNS: "NS",
+  BRION: "BRO",
+  BFX: "FOX",
+};
+const CORS_PROXIES = [
+  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+const RESPONSE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const FALLBACK_DATA = {
+  "/leagues": [
+    { leagueId: "LCK", leagueName: "LCK", isOfficial: true, level: "primary" },
+    { leagueId: "LEC", leagueName: "LEC", isOfficial: true, level: "primary" },
+    { leagueId: "LPL", leagueName: "LPL", isOfficial: true, level: "primary" },
+    { leagueId: "LCS", leagueName: "LCS", isOfficial: true, level: "primary" },
+    { leagueId: "MSI", leagueName: "MSI", isOfficial: true, level: "primary" },
+    { leagueId: "WCS", leagueName: "Worlds", isOfficial: true, level: "primary" },
+  ],
+  "/teams": [
+    { teamId: "T1", name: "T1" },
+    { teamId: "GEN", name: "Gen.G" },
+    { teamId: "DK", name: "Dplus KIA" },
+    { teamId: "HLE", name: "Hanwha Life Esports" },
+    { teamId: "KT", name: "KT Rolster" },
+    { teamId: "DRX", name: "DRX" },
+    { teamId: "KDF", name: "Kwangdong Freecs" },
+    { teamId: "NS", name: "Nongshim RedForce" },
+    { teamId: "BRO", name: "OKSavingsBank BRION" },
+    { teamId: "FOX", name: "FearX" },
+    { teamId: "G2", name: "G2 Esports" },
+    { teamId: "FNC", name: "Fnatic" },
+    { teamId: "MDK", name: "MAD Lions KOI" },
+    { teamId: "BDS", name: "Team BDS" },
+    { teamId: "VIT", name: "Team Vitality" },
+    { teamId: "SK", name: "SK Gaming" },
+    { teamId: "TH", name: "Team Heretics" },
+    { teamId: "GX", name: "GIANTX" },
+    { teamId: "KC", name: "Karmine Corp" },
+    { teamId: "RGE", name: "Rogue" },
+    { teamId: "TES", name: "Top Esports" },
+    { teamId: "JDG", name: "JD Gaming" },
+    { teamId: "BLG", name: "Bilibili Gaming" },
+    { teamId: "LNG", name: "LNG Esports" },
+    { teamId: "WBG", name: "Weibo Gaming" },
+    { teamId: "EDG", name: "EDward Gaming" },
+    { teamId: "RNG", name: "Royal Never Give Up" },
+    { teamId: "IG", name: "Invictus Gaming" },
+    { teamId: "FPX", name: "FunPlus Phoenix" },
+    { teamId: "OMG", name: "Oh My God" },
+    { teamId: "NIP", name: "Ninjas in Pyjamas" },
+    { teamId: "WE", name: "Team WE" },
+    { teamId: "LGD", name: "LGD Gaming" },
+    { teamId: "AL", name: "Anyone's Legend" },
+    { teamId: "RA", name: "Rare Atom" },
+    { teamId: "TT", name: "ThunderTalk Gaming" },
+    { teamId: "UP", name: "Ultra Prime" },
+  ],
+};
 const LIVE_WINDOW_MS = 3 * 60 * 60 * 1000;
 const PREVIOUS_LIMIT = 10;
 const LEAGUE_STORAGE_KEY = "lolScheduleLeagueId";
@@ -141,11 +230,60 @@ function getMatchStartValue(match) {
   );
 }
 
+function normalizeId(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function getKnownTeamIds() {
+  return new Set([...state.teamsById.keys(), ...Object.keys(TEAM_BRAND_MAP)]);
+}
+
+function getClosestTeamId(inputId) {
+  const normalizedInput = normalizeId(inputId);
+  if (!normalizedInput) {
+    return null;
+  }
+
+  const candidates = Array.from(getKnownTeamIds());
+  let bestMatch = null;
+  let bestScore = Infinity;
+
+  candidates.forEach((candidate) => {
+    const score = levenshtein(normalizeId(candidate), normalizedInput);
+    if (score < bestScore) {
+      bestScore = score;
+      bestMatch = candidate;
+    }
+  });
+
+  if (bestScore <= 2) {
+    return bestMatch;
+  }
+
+  return null;
+}
+
+function resolveTeamId(teamId) {
+  if (!teamId) {
+    return null;
+  }
+  if (TEAM_ID_ALIASES[teamId]) {
+    return TEAM_ID_ALIASES[teamId];
+  }
+  if (state.teamsById.has(teamId) || TEAM_BRAND_MAP[teamId]) {
+    return teamId;
+  }
+  return getClosestTeamId(teamId) || teamId;
+}
+
 function resolveTeamName(teamId) {
   if (!teamId) {
     return "TBD";
   }
-  return state.teamsById.get(teamId) || teamId;
+  const resolvedId = resolveTeamId(teamId);
+  return state.teamsById.get(resolvedId) || resolvedId;
 }
 
 function resolveLeagueName(leagueId) {
@@ -175,46 +313,134 @@ function hexToRgba(hex, alpha) {
 }
 
 function getTeamBrand(teamId) {
-  if (!teamId) {
+  const resolvedId = resolveTeamId(teamId);
+  if (!resolvedId) {
     return null;
   }
-  const brand = TEAM_BRAND_MAP[teamId];
+  const brand = TEAM_BRAND_MAP[resolvedId];
   if (!brand) {
     return null;
   }
   return {
     color: brand.color,
-    logoUrl: brand.logoUrl || `${TEAM_LOGO_BASE}${teamId}.png`,
+    logoUrl: brand.logoUrl || `${TEAM_LOGO_BASE}${resolvedId}.png`,
   };
+}
+
+function levenshtein(a, b) {
+  const aLen = a.length;
+  const bLen = b.length;
+  if (!aLen) return bLen;
+  if (!bLen) return aLen;
+
+  const matrix = Array.from({ length: aLen + 1 }, () => new Array(bLen + 1).fill(0));
+  for (let i = 0; i <= aLen; i += 1) {
+    matrix[i][0] = i;
+  }
+  for (let j = 0; j <= bLen; j += 1) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= aLen; i += 1) {
+    for (let j = 1; j <= bLen; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return matrix[aLen][bLen];
+}
+
+function getCachedResponse(path) {
+  try {
+    const raw = localStorage.getItem(`lolScheduleCache:${path}`);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed?.timestamp || parsed?.data === undefined) {
+      return null;
+    }
+    if (Date.now() - parsed.timestamp > RESPONSE_CACHE_TTL_MS) {
+      return null;
+    }
+    return parsed.data;
+  } catch (error) {
+    return null;
+  }
+}
+
+function setCachedResponse(path, data) {
+  try {
+    localStorage.setItem(
+      `lolScheduleCache:${path}`,
+      JSON.stringify({ timestamp: Date.now(), data })
+    );
+  } catch (error) {
+    console.warn("Unable to store response cache.", error);
+  }
 }
 
 async function fetchJson(path) {
   const url = `${API_BASE}${path}`;
+  const urlsToTry = [url, ...CORS_PROXIES.map((proxy) => proxy(url))];
 
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
+  for (const targetUrl of urlsToTry) {
+    try {
+      const response = await fetch(targetUrl);
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+      const data = await response.json();
+      setCachedResponse(path, data);
+      return data;
+    } catch (error) {
+      // Continue to the next URL.
     }
-    return response.json();
-  } catch (error) {
-    // Fallback for browsers that block the API due to missing CORS headers.
-    const proxiedUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-    const response = await fetch(proxiedUrl);
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
-    }
-    return response.json();
   }
+
+  const cached = getCachedResponse(path);
+  if (cached !== null) {
+    return cached;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(FALLBACK_DATA, path)) {
+    return FALLBACK_DATA[path];
+  }
+
+  throw new Error(`All requests failed for ${path}`);
 }
 
-function getWatchLink(match, leagueId, isLive) {
-  if (isLive) {
-    return STREAMS_BY_LEAGUE_ID[leagueId] || "https://www.youtube.com/@lolesports/live";
+function getLiveLinks(leagueId) {
+  const streamInfo =
+    STREAMS_BY_LEAGUE_ID[leagueId] || {
+      official: "https://www.youtube.com/@lolesports/live",
+    };
+  const links = [
+    {
+      label: "Official live",
+      url: streamInfo.official,
+    },
+  ];
+  if (streamInfo.coStream) {
+    links.push({
+      label: "Caedrel co-stream (if live)",
+      url: streamInfo.coStream,
+    });
   }
+  return links;
+}
 
+function getVodLink(match, leagueId) {
   if (match.vod) {
-    return match.vod;
+    return {
+      label: "Official VOD",
+      url: match.vod,
+    };
   }
 
   const blueId = match.blueTeamId || match.blueTeam?.id;
@@ -225,8 +451,13 @@ function getWatchLink(match, leagueId, isLive) {
   const startTime = normalizeStartTime(getMatchStartValue(match));
   const dateLabel = startTime ? formatDayLabel(startTime) : "";
 
-  const query = [leagueName, teamA, teamB, dateLabel, "full game"].filter(Boolean).join(" ");
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  const query = [leagueName, teamA, teamB, dateLabel, "full game"]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    label: "YouTube replay search",
+    url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+  };
 }
 
 async function fetchLeagueHasData(leagueId) {
@@ -315,14 +546,23 @@ function buildMatchCard(match, leagueId, isLive) {
   const logoB = brandB?.logoUrl
     ? `<span class="team-logo" style="--logo-url:url('${brandB.logoUrl}')">${redId}</span>`
     : `<span class="team-logo team-logo--fallback">${redId}</span>`;
-  const watchLabel = isLive ? "Watch live" : "Watch replay";
-  const watchLink = !isUpcoming ? getWatchLink(match, leagueId, isLive) : "";
-  const watchMarkup = !isUpcoming
+  const watchLinks = isUpcoming
+    ? []
+    : isLive
+      ? getLiveLinks(leagueId)
+      : [getVodLink(match, leagueId)];
+  const watchMarkup = watchLinks.length
     ? `
         <div class="match-actions">
-          <a class="match-link" href="${watchLink}" target="_blank" rel="noopener noreferrer">
-            ${watchLabel}
-          </a>
+          ${watchLinks
+            .map(
+              (link) => `
+                <a class="match-link" href="${link.url}" target="_blank" rel="noopener noreferrer">
+                  ${link.label}
+                </a>
+              `
+            )
+            .join("")}
         </div>
       `
     : "";
