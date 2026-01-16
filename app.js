@@ -3,6 +3,7 @@ const APP_CONFIG = window.APP_CONFIG || {};
 const TWITCH_CLIENT_ID = APP_CONFIG.twitchClientId || "";
 const TWITCH_ACCESS_TOKEN = APP_CONFIG.twitchAccessToken || "";
 const TWITCH_STREAMER_LOGIN = APP_CONFIG.twitchStreamerLogin || "caedrel";
+const PROXY_BASE_URL = APP_CONFIG.proxyBaseUrl || "";
 const PRIORITY_EVENT_IDS = ["MSI", "WCS", "FST", "FS"];
 const MAJOR_LEAGUE_IDS = ["LCK", "LPL", "LCS", "LEC"];
 const MAIN_LEAGUE_IDS = [
@@ -669,8 +670,35 @@ function getYouTubeApiKey() {
   return YOUTUBE_API_KEY;
 }
 
+function getProxyBaseUrl() {
+  if (!PROXY_BASE_URL) {
+    return "";
+  }
+  return PROXY_BASE_URL.replace(/\/+$/, "");
+}
+
+function hasYouTubeAccess() {
+  return Boolean(getProxyBaseUrl() || getYouTubeApiKey());
+}
+
 async function fetchYouTubeJson(endpoint, params) {
   try {
+    const proxyBase = getProxyBaseUrl();
+    if (proxyBase) {
+      const url = new URL(`${proxyBase}/youtube`);
+      url.searchParams.set("endpoint", endpoint);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== "") {
+          url.searchParams.set(key, String(value));
+        }
+      });
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`YouTube proxy failed: ${response.status}`);
+      }
+      return await response.json();
+    }
+
     const apiKey = getYouTubeApiKey();
     if (!apiKey) {
       return null;
@@ -694,10 +722,10 @@ async function fetchYouTubeJson(endpoint, params) {
 }
 
 async function fetchLckGlobalChannelId() {
-  const apiKey = getYouTubeApiKey();
-  if (!apiKey) {
+  if (!hasYouTubeAccess()) {
     return null;
   }
+  const apiKey = getYouTubeApiKey();
   if (lckChannelIdValue && lckChannelIdKey === apiKey) {
     return lckChannelIdValue;
   }
@@ -936,8 +964,7 @@ async function fetchLckLiveStartUrl(matchupString) {
 }
 
 async function hydrateLckLiveStartLinks(container) {
-  const apiKey = getYouTubeApiKey();
-  if (!apiKey || !container) {
+  if (!hasYouTubeAccess() || !container) {
     return;
   }
 
@@ -960,8 +987,7 @@ async function hydrateLckLiveStartLinks(container) {
 }
 
 async function fetchLckEnglishChannelId() {
-  const apiKey = getYouTubeApiKey();
-  if (!apiKey) {
+  if (!hasYouTubeAccess()) {
     return null;
   }
   const data = await fetchYouTubeJson("channels", {
@@ -1194,8 +1220,7 @@ function buildLckSingleMatchupString(match) {
 }
 
 async function hydrateLckVodLinks(container) {
-  const apiKey = getYouTubeApiKey();
-  if (!apiKey || !container) {
+  if (!hasYouTubeAccess() || !container) {
     return;
   }
 
@@ -1364,7 +1389,7 @@ function getLiveLinks(leagueId) {
       url: streamInfo.coStream,
     });
   }
-  if (leagueId === "LCK" && getYouTubeApiKey()) {
+  if (leagueId === "LCK" && hasYouTubeAccess()) {
     links.push({
       label: LCK_LIVE_START_LABEL,
       url: `${LCK_GLOBAL_CHANNEL_URL}/live`,
@@ -1375,6 +1400,25 @@ function getLiveLinks(leagueId) {
 }
 
 async function refreshCaedrelStatus() {
+  const proxyBase = getProxyBaseUrl();
+  if (proxyBase) {
+    try {
+      const url = new URL(`${proxyBase}/twitch-status`);
+      url.searchParams.set("user_login", TWITCH_STREAMER_LOGIN);
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`Twitch proxy failed: ${response.status}`);
+      }
+      const data = await response.json();
+      state.caedrelLive = Array.isArray(data?.data) && data.data.length > 0;
+      return;
+    } catch (error) {
+      console.warn("Unable to check Twitch live status via proxy.", error);
+      state.caedrelLive = null;
+      return;
+    }
+  }
+
   if (!TWITCH_CLIENT_ID || !TWITCH_ACCESS_TOKEN) {
     state.caedrelLive = null;
     return;

@@ -74,7 +74,18 @@
       <section class="table" id="table"></section>
     </main>
 
-    <script src="config.js"></script>
+    <script src="config.example.js"></script>
+    <script>
+      (function () {
+        var script = document.createElement("script");
+        script.src = "config.js";
+        script.async = false;
+        script.onerror = function () {
+          // Optional local config file missing; defaults from config.example.js apply.
+        };
+        document.head.appendChild(script);
+      })();
+    </script>
     <script src="app.js"></script>
   </body>
 </html>
