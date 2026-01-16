@@ -43,17 +43,16 @@ const TEAM_BRAND_MAP = {
   NS: { color: "#5B5B5B", logoUrl: `${LOCAL_LOGO_BASE}NS.svg` },
   BRO: { color: "#1B5C2E", logoUrl: `${LOCAL_LOGO_BASE}BRO.svg` },
   FOX: { color: "#111111", logoUrl: `${LOCAL_LOGO_BASE}FOX.svg` },
-  G2: { color: "#C9A63B", logoUrl: `${LOCAL_LOGO_BASE}G2.svg` },
-  FNC: { color: "#FF6A00", logoUrl: `${LOCAL_LOGO_BASE}FNC.svg` },
-  MDK: { color: "#E11D48", logoUrl: `${LOCAL_LOGO_BASE}MDK.svg` },
-  MAD: { color: "#E11D48", logoUrl: `${LOCAL_LOGO_BASE}MDK.svg` },
-  BDS: { color: "#0D47A1", logoUrl: `${LOCAL_LOGO_BASE}BDS.svg` },
-  VIT: { color: "#F2E74B", logoUrl: `${LOCAL_LOGO_BASE}VIT.svg` },
-  SK: { color: "#C00000", logoUrl: `${LOCAL_LOGO_BASE}SK.svg` },
-  TH: { color: "#7A5CFF", logoUrl: `${LOCAL_LOGO_BASE}TH.svg` },
-  GX: { color: "#191970", logoUrl: `${LOCAL_LOGO_BASE}GX.svg` },
-  KC: { color: "#1F6FEB", logoUrl: `${LOCAL_LOGO_BASE}KC.svg` },
-  RGE: { color: "#111827", logoUrl: `${LOCAL_LOGO_BASE}RGE.svg` },
+  G2: { color: "#C9A63B" },
+  FNC: { color: "#FF6A00" },
+  MDK: { color: "#E11D48" },
+  MAD: { color: "#E11D48" },
+  BDS: { color: "#0D47A1" },
+  VIT: { color: "#F2E74B" },
+  SK: { color: "#C00000" },
+  TH: { color: "#7A5CFF" },
+  GX: { color: "#191970" },
+  KC: { color: "#1F6FEB" },
   TL: { color: "#001C3D" },
   C9: { color: "#6AAFE6" },
   "100": { color: "#DBB25F" },
@@ -134,6 +133,33 @@ const FALLBACK_DATA = {
     { teamId: "RA", name: "Rare Atom" },
     { teamId: "TT", name: "ThunderTalk Gaming" },
     { teamId: "UP", name: "Ultra Prime" },
+  ],
+};
+const CORS_PROXIES = [
+  "https://corsproxy.io/?",
+  "https://cors.isomorphic-git.org/",
+];
+const RESPONSE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const FALLBACK_DATA = {
+  "/leagues": [
+    { leagueId: "LCK", leagueName: "LCK", isOfficial: true, level: "primary" },
+    { leagueId: "LEC", leagueName: "LEC", isOfficial: true, level: "primary" },
+    { leagueId: "LPL", leagueName: "LPL", isOfficial: true, level: "primary" },
+    { leagueId: "LCS", leagueName: "LCS", isOfficial: true, level: "primary" },
+    { leagueId: "MSI", leagueName: "MSI", isOfficial: true, level: "primary" },
+    { leagueId: "WCS", leagueName: "Worlds", isOfficial: true, level: "primary" },
+  ],
+  "/teams": [
+    { teamId: "T1", name: "T1" },
+    { teamId: "GEN", name: "Gen.G" },
+    { teamId: "DK", name: "Dplus KIA" },
+    { teamId: "HLE", name: "Hanwha Life Esports" },
+    { teamId: "KT", name: "KT Rolster" },
+    { teamId: "DRX", name: "DRX" },
+    { teamId: "KDF", name: "Kwangdong Freecs" },
+    { teamId: "NS", name: "Nongshim RedForce" },
+    { teamId: "BRO", name: "OKSavingsBank BRION" },
+    { teamId: "FOX", name: "FearX" },
   ],
 };
 const LIVE_WINDOW_MS = 3 * 60 * 60 * 1000;
@@ -327,34 +353,6 @@ function getTeamBrand(teamId) {
   };
 }
 
-function levenshtein(a, b) {
-  const aLen = a.length;
-  const bLen = b.length;
-  if (!aLen) return bLen;
-  if (!bLen) return aLen;
-
-  const matrix = Array.from({ length: aLen + 1 }, () => new Array(bLen + 1).fill(0));
-  for (let i = 0; i <= aLen; i += 1) {
-    matrix[i][0] = i;
-  }
-  for (let j = 0; j <= bLen; j += 1) {
-    matrix[0][j] = j;
-  }
-
-  for (let i = 1; i <= aLen; i += 1) {
-    for (let j = 1; j <= bLen; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost
-      );
-    }
-  }
-
-  return matrix[aLen][bLen];
-}
-
 function getCachedResponse(path) {
   try {
     const raw = localStorage.getItem(`lolScheduleCache:${path}`);
@@ -387,7 +385,7 @@ function setCachedResponse(path, data) {
 
 async function fetchJson(path) {
   const url = `${API_BASE}${path}`;
-  const urlsToTry = [url, ...CORS_PROXIES.map((proxy) => proxy(url))];
+  const urlsToTry = [url, ...CORS_PROXIES.map((proxy) => `${proxy}${encodeURIComponent(url)}`)];
 
   for (const targetUrl of urlsToTry) {
     try {
@@ -497,13 +495,16 @@ async function filterLeaguesWithData(leagues) {
         const hasData = await fetchLeagueHasData(league.leagueId);
         dataCache[league.leagueId] = hasData;
       } catch (error) {
-        dataCache[league.leagueId] = false;
+        dataCache[league.leagueId] =
+          PRIORITY_EVENT_IDS.includes(league.leagueId) ||
+          MAJOR_LEAGUE_IDS.includes(league.leagueId);
       }
     });
     setLeagueDataCache(dataCache);
   }
 
-  return leagues.filter((league) => dataCache[league.leagueId]);
+  const filtered = leagues.filter((league) => dataCache[league.leagueId]);
+  return filtered.length ? filtered : leagues;
 }
 
 async function loadTeams() {
