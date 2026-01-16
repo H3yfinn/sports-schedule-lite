@@ -58,14 +58,82 @@ const TEAM_BRAND_MAP = {
   "100": { color: "#DBB25F" },
   FLY: { color: "#00C2A8" },
   NRG: { color: "#111111" },
-  TES: { color: "#0077C8" },
-  JDG: { color: "#D4AF37" },
-  BLG: { color: "#0084FF" },
-  LNG: { color: "#00C7B7" },
-  WBG: { color: "#D71920" },
-  EDG: { color: "#002A5C" },
-  RNG: { color: "#D40000" },
-  IG: { color: "#0B1F2A" },
+  TES: { color: "#0077C8", logoUrl: `${LOCAL_LOGO_BASE}TES.svg` },
+  JDG: { color: "#D4AF37", logoUrl: `${LOCAL_LOGO_BASE}JDG.svg` },
+  BLG: { color: "#0084FF", logoUrl: `${LOCAL_LOGO_BASE}BLG.svg` },
+  LNG: { color: "#00C7B7", logoUrl: `${LOCAL_LOGO_BASE}LNG.svg` },
+  WBG: { color: "#D71920", logoUrl: `${LOCAL_LOGO_BASE}WBG.svg` },
+  EDG: { color: "#002A5C", logoUrl: `${LOCAL_LOGO_BASE}EDG.svg` },
+  RNG: { color: "#D40000", logoUrl: `${LOCAL_LOGO_BASE}RNG.svg` },
+  IG: { color: "#0B1F2A", logoUrl: `${LOCAL_LOGO_BASE}IG.svg` },
+  FPX: { color: "#E10600", logoUrl: `${LOCAL_LOGO_BASE}FPX.svg` },
+  OMG: { color: "#111111", logoUrl: `${LOCAL_LOGO_BASE}OMG.svg` },
+  NIP: { color: "#7C3AED", logoUrl: `${LOCAL_LOGO_BASE}NIP.svg` },
+  WE: { color: "#B91C1C", logoUrl: `${LOCAL_LOGO_BASE}WE.svg` },
+  LGD: { color: "#2563EB", logoUrl: `${LOCAL_LOGO_BASE}LGD.svg` },
+  AL: { color: "#0F766E", logoUrl: `${LOCAL_LOGO_BASE}AL.svg` },
+  RA: { color: "#F97316", logoUrl: `${LOCAL_LOGO_BASE}RA.svg` },
+  TT: { color: "#2563EB", logoUrl: `${LOCAL_LOGO_BASE}TT.svg` },
+  UP: { color: "#14B8A6", logoUrl: `${LOCAL_LOGO_BASE}UP.svg` },
+};
+const TEAM_ID_ALIASES = {
+  DNS: "NS",
+  BRION: "BRO",
+  BFX: "FOX",
+};
+const CORS_PROXIES = [
+  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+const RESPONSE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const FALLBACK_DATA = {
+  "/leagues": [
+    { leagueId: "LCK", leagueName: "LCK", isOfficial: true, level: "primary" },
+    { leagueId: "LEC", leagueName: "LEC", isOfficial: true, level: "primary" },
+    { leagueId: "LPL", leagueName: "LPL", isOfficial: true, level: "primary" },
+    { leagueId: "LCS", leagueName: "LCS", isOfficial: true, level: "primary" },
+    { leagueId: "MSI", leagueName: "MSI", isOfficial: true, level: "primary" },
+    { leagueId: "WCS", leagueName: "Worlds", isOfficial: true, level: "primary" },
+  ],
+  "/teams": [
+    { teamId: "T1", name: "T1" },
+    { teamId: "GEN", name: "Gen.G" },
+    { teamId: "DK", name: "Dplus KIA" },
+    { teamId: "HLE", name: "Hanwha Life Esports" },
+    { teamId: "KT", name: "KT Rolster" },
+    { teamId: "DRX", name: "DRX" },
+    { teamId: "KDF", name: "Kwangdong Freecs" },
+    { teamId: "NS", name: "Nongshim RedForce" },
+    { teamId: "BRO", name: "OKSavingsBank BRION" },
+    { teamId: "FOX", name: "FearX" },
+    { teamId: "G2", name: "G2 Esports" },
+    { teamId: "FNC", name: "Fnatic" },
+    { teamId: "MDK", name: "MAD Lions KOI" },
+    { teamId: "BDS", name: "Team BDS" },
+    { teamId: "VIT", name: "Team Vitality" },
+    { teamId: "SK", name: "SK Gaming" },
+    { teamId: "TH", name: "Team Heretics" },
+    { teamId: "GX", name: "GIANTX" },
+    { teamId: "KC", name: "Karmine Corp" },
+    { teamId: "RGE", name: "Rogue" },
+    { teamId: "TES", name: "Top Esports" },
+    { teamId: "JDG", name: "JD Gaming" },
+    { teamId: "BLG", name: "Bilibili Gaming" },
+    { teamId: "LNG", name: "LNG Esports" },
+    { teamId: "WBG", name: "Weibo Gaming" },
+    { teamId: "EDG", name: "EDward Gaming" },
+    { teamId: "RNG", name: "Royal Never Give Up" },
+    { teamId: "IG", name: "Invictus Gaming" },
+    { teamId: "FPX", name: "FunPlus Phoenix" },
+    { teamId: "OMG", name: "Oh My God" },
+    { teamId: "NIP", name: "Ninjas in Pyjamas" },
+    { teamId: "WE", name: "Team WE" },
+    { teamId: "LGD", name: "LGD Gaming" },
+    { teamId: "AL", name: "Anyone's Legend" },
+    { teamId: "RA", name: "Rare Atom" },
+    { teamId: "TT", name: "ThunderTalk Gaming" },
+    { teamId: "UP", name: "Ultra Prime" },
+  ],
 };
 const CORS_PROXIES = [
   "https://corsproxy.io/?",
@@ -188,11 +256,60 @@ function getMatchStartValue(match) {
   );
 }
 
+function normalizeId(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function getKnownTeamIds() {
+  return new Set([...state.teamsById.keys(), ...Object.keys(TEAM_BRAND_MAP)]);
+}
+
+function getClosestTeamId(inputId) {
+  const normalizedInput = normalizeId(inputId);
+  if (!normalizedInput) {
+    return null;
+  }
+
+  const candidates = Array.from(getKnownTeamIds());
+  let bestMatch = null;
+  let bestScore = Infinity;
+
+  candidates.forEach((candidate) => {
+    const score = levenshtein(normalizeId(candidate), normalizedInput);
+    if (score < bestScore) {
+      bestScore = score;
+      bestMatch = candidate;
+    }
+  });
+
+  if (bestScore <= 2) {
+    return bestMatch;
+  }
+
+  return null;
+}
+
+function resolveTeamId(teamId) {
+  if (!teamId) {
+    return null;
+  }
+  if (TEAM_ID_ALIASES[teamId]) {
+    return TEAM_ID_ALIASES[teamId];
+  }
+  if (state.teamsById.has(teamId) || TEAM_BRAND_MAP[teamId]) {
+    return teamId;
+  }
+  return getClosestTeamId(teamId) || teamId;
+}
+
 function resolveTeamName(teamId) {
   if (!teamId) {
     return "TBD";
   }
-  return state.teamsById.get(teamId) || teamId;
+  const resolvedId = resolveTeamId(teamId);
+  return state.teamsById.get(resolvedId) || resolvedId;
 }
 
 function resolveLeagueName(leagueId) {
@@ -222,16 +339,17 @@ function hexToRgba(hex, alpha) {
 }
 
 function getTeamBrand(teamId) {
-  if (!teamId) {
+  const resolvedId = resolveTeamId(teamId);
+  if (!resolvedId) {
     return null;
   }
-  const brand = TEAM_BRAND_MAP[teamId];
+  const brand = TEAM_BRAND_MAP[resolvedId];
   if (!brand) {
     return null;
   }
   return {
     color: brand.color,
-    logoUrl: brand.logoUrl || `${TEAM_LOGO_BASE}${teamId}.png`,
+    logoUrl: brand.logoUrl || `${TEAM_LOGO_BASE}${resolvedId}.png`,
   };
 }
 

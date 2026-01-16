@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="G2 logo">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="rgba(0,0,0,0.2)" />
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="#C9A63B" filter="url(#shadow)" />
+  <text x="32" y="38" text-anchor="middle" font-family="'Space Grotesk', 'Source Sans 3', sans-serif" font-size="20" font-weight="700" fill="#ffffff">
+    G2
+  </text>
+</svg>
