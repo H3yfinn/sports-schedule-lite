@@ -2,26 +2,47 @@ const API_BASE = "https://api.lol-esports.mckernant1.com";
 const PRIORITY_EVENT_IDS = ["MSI", "WCS", "FST", "FS"];
 const MAJOR_LEAGUE_IDS = ["LCK", "LEC", "LPL", "LCS"];
 const STREAMS_BY_LEAGUE_ID = {
-  LCK: "https://www.youtube.com/@LCKglobal/live",
-  LEC: "https://www.youtube.com/@LEC/live",
-  LPL: "https://www.youtube.com/@lplenglish/live",
-  LCS: "https://www.youtube.com/@LCS/live",
-  MSI: "https://www.youtube.com/@lolesports/live",
-  WCS: "https://www.youtube.com/@lolesports/live",
-  FST: "https://www.youtube.com/@lolesports/live",
-  FS: "https://www.youtube.com/@lolesports/live",
+  LCK: {
+    official: "https://www.youtube.com/@LCKglobal/live",
+    coStream: "https://www.twitch.tv/caedrel",
+  },
+  LEC: {
+    official: "https://www.youtube.com/@LEC/live",
+    coStream: "https://www.twitch.tv/caedrel",
+  },
+  LPL: {
+    official: "https://www.youtube.com/@lplenglish/live",
+  },
+  LCS: {
+    official: "https://www.youtube.com/@LCS/live",
+  },
+  MSI: {
+    official: "https://www.youtube.com/@lolesports/live",
+    coStream: "https://www.twitch.tv/caedrel",
+  },
+  WCS: {
+    official: "https://www.youtube.com/@lolesports/live",
+  },
+  FST: {
+    official: "https://www.youtube.com/@lolesports/live",
+  },
+  FS: {
+    official: "https://www.youtube.com/@lolesports/live",
+  },
 };
 const TEAM_LOGO_BASE = "https://static.lolesports.com/teams/";
+const LOCAL_LOGO_BASE = "assets/logos/";
 const TEAM_BRAND_MAP = {
-  T1: { color: "#C8102E" },
-  GEN: { color: "#AF8B4C" },
-  DK: { color: "#0A1A3F" },
-  HLE: { color: "#F37021" },
-  KT: { color: "#E2231A" },
-  DRX: { color: "#1E5AA8" },
-  KDF: { color: "#1E73BE" },
-  NS: { color: "#5B5B5B" },
-  BRO: { color: "#1B5C2E" },
+  T1: { color: "#C8102E", logoUrl: `${LOCAL_LOGO_BASE}T1.svg` },
+  GEN: { color: "#AF8B4C", logoUrl: `${LOCAL_LOGO_BASE}GEN.svg` },
+  DK: { color: "#0A1A3F", logoUrl: `${LOCAL_LOGO_BASE}DK.svg` },
+  HLE: { color: "#F37021", logoUrl: `${LOCAL_LOGO_BASE}HLE.svg` },
+  KT: { color: "#E2231A", logoUrl: `${LOCAL_LOGO_BASE}KT.svg` },
+  DRX: { color: "#1E5AA8", logoUrl: `${LOCAL_LOGO_BASE}DRX.svg` },
+  KDF: { color: "#1E73BE", logoUrl: `${LOCAL_LOGO_BASE}KDF.svg` },
+  NS: { color: "#5B5B5B", logoUrl: `${LOCAL_LOGO_BASE}NS.svg` },
+  BRO: { color: "#1B5C2E", logoUrl: `${LOCAL_LOGO_BASE}BRO.svg` },
+  FOX: { color: "#111111", logoUrl: `${LOCAL_LOGO_BASE}FOX.svg` },
   G2: { color: "#C9A63B" },
   FNC: { color: "#FF6A00" },
   MDK: { color: "#E11D48" },
@@ -208,13 +229,32 @@ async function fetchJson(path) {
   }
 }
 
-function getWatchLink(match, leagueId, isLive) {
-  if (isLive) {
-    return STREAMS_BY_LEAGUE_ID[leagueId] || "https://www.youtube.com/@lolesports/live";
+function getLiveLinks(leagueId) {
+  const streamInfo =
+    STREAMS_BY_LEAGUE_ID[leagueId] || {
+      official: "https://www.youtube.com/@lolesports/live",
+    };
+  const links = [
+    {
+      label: "Official live",
+      url: streamInfo.official,
+    },
+  ];
+  if (streamInfo.coStream) {
+    links.push({
+      label: "Caedrel co-stream (if live)",
+      url: streamInfo.coStream,
+    });
   }
+  return links;
+}
 
+function getVodLink(match, leagueId) {
   if (match.vod) {
-    return match.vod;
+    return {
+      label: "Official VOD",
+      url: match.vod,
+    };
   }
 
   const blueId = match.blueTeamId || match.blueTeam?.id;
@@ -225,8 +265,13 @@ function getWatchLink(match, leagueId, isLive) {
   const startTime = normalizeStartTime(getMatchStartValue(match));
   const dateLabel = startTime ? formatDayLabel(startTime) : "";
 
-  const query = [leagueName, teamA, teamB, dateLabel, "full game"].filter(Boolean).join(" ");
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  const query = [leagueName, teamA, teamB, dateLabel, "full game"]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    label: "YouTube replay search",
+    url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+  };
 }
 
 async function fetchLeagueHasData(leagueId) {
@@ -315,14 +360,23 @@ function buildMatchCard(match, leagueId, isLive) {
   const logoB = brandB?.logoUrl
     ? `<span class="team-logo" style="--logo-url:url('${brandB.logoUrl}')">${redId}</span>`
     : `<span class="team-logo team-logo--fallback">${redId}</span>`;
-  const watchLabel = isLive ? "Watch live" : "Watch replay";
-  const watchLink = !isUpcoming ? getWatchLink(match, leagueId, isLive) : "";
-  const watchMarkup = !isUpcoming
+  const watchLinks = isUpcoming
+    ? []
+    : isLive
+      ? getLiveLinks(leagueId)
+      : [getVodLink(match, leagueId)];
+  const watchMarkup = watchLinks.length
     ? `
         <div class="match-actions">
-          <a class="match-link" href="${watchLink}" target="_blank" rel="noopener noreferrer">
-            ${watchLabel}
-          </a>
+          ${watchLinks
+            .map(
+              (link) => `
+                <a class="match-link" href="${link.url}" target="_blank" rel="noopener noreferrer">
+                  ${link.label}
+                </a>
+              `
+            )
+            .join("")}
         </div>
       `
     : "";

@@ -244,6 +244,8 @@ select {
 .match-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .match-link {
