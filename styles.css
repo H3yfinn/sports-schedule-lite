@@ -64,6 +64,23 @@ body {
   transform: translateY(0);
 }
 
+.debug-panel {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  max-width: 320px;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.95);
+  font-size: 11px;
+  color: var(--text);
+  box-shadow: 0 8px 18px rgba(27, 27, 27, 0.12);
+  z-index: 20;
+}
+
 .loading-spinner {
   width: 14px;
   height: 14px;

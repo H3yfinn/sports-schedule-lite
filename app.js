@@ -239,12 +239,23 @@ const TEAM_ID_ALIASES = {
   BRION: "BRO",
   BFX: "FOX",
 };
+const LCK_ENGLISH_TEAM_ALIASES = {
+  BFX: ["FEARX", "BNK FEARX"],
+  BRO: ["BRION", "HANJIN BRION", "OKSAVINGSBANK BRION"],
+  DNS: ["DN SOOPERS", "DN SOOPER", "DN SOOPERS"],
+  DK: ["DPLUS KIA", "DPLUSKIA"],
+  GEN: ["GENG", "GEN G", "GEN.G"],
+  HLE: ["HANWHA LIFE", "HANWHA LIFE ESPORTS"],
+  KT: ["KT ROLSTER"],
+  NS: ["NONGSHIM", "NONGSHIM REDFORCE"],
+};
 const TEAM_DISPLAY_ID_OVERRIDES = {
   FOX: "BFX",
 };
 const CORS_PROXIES = [
   "https://corsproxy.io/?",
   "https://api.allorigins.win/raw?url=",
+  "https://api.allorigins.win/get?url=",
 ];
 const RESPONSE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_DATA = {
@@ -353,6 +364,46 @@ const leagueOptionsList = document.getElementById("leagueOptions");
 const viewButtons = Array.from(document.querySelectorAll(".view-button"));
 const loadingIndicator = document.getElementById("loadingIndicator");
 let loadingCount = 0;
+const DEBUG_ENABLED = (() => {
+  try {
+    return localStorage.getItem("lolScheduleDebug") === "true";
+  } catch (error) {
+    return false;
+  }
+})();
+let debugPanel = null;
+
+function logDebug(message, details) {
+  if (!DEBUG_ENABLED) {
+    return;
+  }
+  if (!debugPanel) {
+    debugPanel = document.createElement("div");
+    debugPanel.className = "debug-panel";
+    debugPanel.innerHTML = "<strong>Debug</strong>";
+    document.body.appendChild(debugPanel);
+  }
+  const line = document.createElement("div");
+  const detailText =
+    details === undefined ? "" : ` ${typeof details === "string" ? details : JSON.stringify(details)}`;
+  line.textContent = `${message}${detailText}`;
+  debugPanel.appendChild(line);
+}
+
+function reportAppError(message) {
+  if (!statusEl) {
+    return;
+  }
+  statusEl.textContent = `App error: ${message}`;
+}
+
+window.addEventListener("error", (event) => {
+  reportAppError(event.message || "Unexpected script error.");
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  reportAppError(event?.reason?.message || "Unexpected async error.");
+});
 
 function setStatus(message) {
   statusEl.textContent = message;
@@ -443,6 +494,46 @@ function normalizeId(value) {
   return String(value || "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
+}
+
+function levenshtein(a, b) {
+  const left = String(a || "");
+  const right = String(b || "");
+  if (left === right) {
+    return 0;
+  }
+  if (!left.length) {
+    return right.length;
+  }
+  if (!right.length) {
+    return left.length;
+  }
+
+  const rows = right.length + 1;
+  const cols = left.length + 1;
+  const matrix = Array.from({ length: rows }, () => new Array(cols).fill(0));
+
+  for (let i = 0; i < rows; i += 1) {
+    matrix[i][0] = i;
+  }
+  for (let j = 0; j < cols; j += 1) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i < rows; i += 1) {
+    const rightChar = right[i - 1];
+    for (let j = 1; j < cols; j += 1) {
+      const leftChar = left[j - 1];
+      const cost = leftChar === rightChar ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return matrix[rows - 1][cols - 1];
 }
 
 function getKnownTeamIds() {
@@ -620,7 +711,10 @@ async function fetchLckGlobalChannelId() {
       part: "id",
       forHandle: LCK_GLOBAL_HANDLE,
     });
-    const channelId = data?.items?.[0]?.id || null;
+    let channelId = data?.items?.[0]?.id || null;
+    if (!channelId) {
+      channelId = await fetchChannelIdBySearch("LCK Global", LCK_GLOBAL_HANDLE);
+    }
     lckChannelIdValue = channelId;
     return channelId;
   })();
@@ -644,12 +738,31 @@ function buildTeamMatchTokens(teamId, teamName) {
   if (normalizedName) {
     tokens.add(normalizedName);
     tokens.add(normalizedName.replace(/\s+/g, ""));
+    const trimmedName = normalizedName
+      .replace(/\bESPORTS\b/g, "")
+      .replace(/\bESPORT\b/g, "")
+      .replace(/\bGAMING\b/g, "")
+      .replace(/\bTEAM\b/g, "")
+      .replace(/\bCLUB\b/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (trimmedName) {
+      tokens.add(trimmedName);
+    }
     const parts = normalizedName.split(" ").filter(Boolean);
     if (parts.length > 1) {
       tokens.add(parts[0]);
       tokens.add(parts[parts.length - 1]);
     }
   }
+  const aliasNames = LCK_ENGLISH_TEAM_ALIASES[teamId] || [];
+  aliasNames.forEach((alias) => {
+    const normalizedAlias = normalizeMatchupText(alias);
+    if (normalizedAlias) {
+      tokens.add(normalizedAlias);
+      tokens.add(normalizedAlias.replace(/\s+/g, ""));
+    }
+  });
   return tokens;
 }
 
@@ -667,6 +780,11 @@ function titleMatchesTeams(title, teamAId, teamBId, teamAName, teamBName) {
     token ? titleNormalized.includes(token) : false
   );
   return matchesTeamA && matchesTeamB;
+}
+
+function isLckGlobalChannelTitle(value) {
+  const title = String(value || "").toLowerCase();
+  return title.includes("lck") && title.includes("global");
 }
 function getLckVodCacheKey(matchupString, matchStartTime) {
   const keyTime = Number.isFinite(matchStartTime) ? String(matchStartTime) : "unknown";
@@ -687,13 +805,10 @@ function isLckVodFresh(publishedAt, matchStartTime) {
 
 async function fetchLckVodVideoId(matchupString, matchStartTime) {
   const channelId = await fetchLckGlobalChannelId();
-  if (!channelId) {
-    return null;
-  }
 
   const primary = await fetchYouTubeJson("search", {
     part: "snippet",
-    channelId,
+    channelId: channelId || undefined,
     type: "video",
     eventType: "completed",
     order: "date",
@@ -702,7 +817,13 @@ async function fetchLckVodVideoId(matchupString, matchStartTime) {
   });
   const primaryItems = Array.isArray(primary?.items) ? primary.items : [];
   const primaryMatch = primaryItems.find((item) => {
-    return isLckVodFresh(item?.snippet?.publishedAt, matchStartTime);
+    if (!isLckVodFresh(item?.snippet?.publishedAt, matchStartTime)) {
+      return false;
+    }
+    if (!channelId) {
+      return isLckGlobalChannelTitle(item?.snippet?.channelTitle);
+    }
+    return true;
   });
   if (primaryMatch?.id?.videoId) {
     return primaryMatch.id.videoId;
@@ -718,7 +839,7 @@ async function fetchLckVodVideoId(matchupString, matchStartTime) {
 
   const fallback = await fetchYouTubeJson("search", {
     part: "snippet",
-    channelId,
+    channelId: channelId || undefined,
     type: "video",
     eventType: "completed",
     order: "date",
@@ -729,6 +850,9 @@ async function fetchLckVodVideoId(matchupString, matchStartTime) {
   const requiredParts = parts.slice(1).map((part) => normalizeMatchupText(part));
   const candidate = fallbackItems.find((item) => {
     if (!item?.id?.videoId || !item?.snippet?.title) {
+      return false;
+    }
+    if (!channelId && !isLckGlobalChannelTitle(item?.snippet?.channelTitle)) {
       return false;
     }
     const titleNormalized = normalizeMatchupText(item.snippet.title);
@@ -844,7 +968,30 @@ async function fetchLckEnglishChannelId() {
     part: "id",
     forHandle: LCK_ENGLISH_HANDLE,
   });
-  return data?.items?.[0]?.id || null;
+  const channelId = data?.items?.[0]?.id || null;
+  if (channelId) {
+    return channelId;
+  }
+  return await fetchChannelIdBySearch("LCK English", LCK_ENGLISH_HANDLE);
+}
+
+async function fetchChannelIdBySearch(displayName, handle) {
+  const data = await fetchYouTubeJson("search", {
+    part: "snippet",
+    type: "channel",
+    maxResults: 5,
+    q: handle || displayName,
+  });
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const needle = String(displayName || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const match = items.find((item) => {
+    const title = String(item?.snippet?.channelTitle || "").toLowerCase();
+    return title.includes(needle);
+  });
+  return match?.id?.channelId || items[0]?.id?.channelId || null;
 }
 
 function parseGameNumber(title) {
@@ -852,14 +999,39 @@ function parseGameNumber(title) {
   return match ? Number(match[1]) : null;
 }
 
-function buildLckEnglishQuery(matchupString, teamAName, teamBName, teamAId, teamBId) {
+function getEnglishTeamQueryOptions(teamId, teamName) {
+  const options = [];
+  if (teamName) {
+    options.push(teamName);
+  }
+  if (teamId) {
+    options.push(teamId);
+  }
+  const aliasNames = LCK_ENGLISH_TEAM_ALIASES[teamId] || [];
+  aliasNames.forEach((alias) => options.push(alias));
+  return Array.from(new Set(options.filter(Boolean))).slice(0, 3);
+}
+
+function buildLckEnglishQueries(matchupString, teamAName, teamBName, teamAId, teamBId) {
+  const teamAOptions = getEnglishTeamQueryOptions(teamAId, teamAName);
+  const teamBOptions = getEnglishTeamQueryOptions(teamBId, teamBName);
+  const queries = [];
+  teamAOptions.forEach((teamA) => {
+    teamBOptions.forEach((teamB) => {
+      queries.push(`${teamA} vs ${teamB}`);
+      queries.push(`${teamB} vs ${teamA}`);
+    });
+  });
   if (teamAName && teamBName) {
-    return `${teamAName} vs ${teamBName}`;
+    queries.push(`${teamAName} ${teamBName}`);
   }
   if (teamAId && teamBId) {
-    return `${teamAId} vs ${teamBId}`;
+    queries.push(`${teamAId} ${teamBId}`);
   }
-  return matchupString;
+  if (matchupString) {
+    queries.push(matchupString);
+  }
+  return Array.from(new Set(queries.filter(Boolean))).slice(0, 8);
 }
 
 async function fetchLckEnglishVodLinks(
@@ -871,101 +1043,101 @@ async function fetchLckEnglishVodLinks(
   teamAName,
   teamBName
 ) {
-  const channelId = await fetchLckEnglishChannelId();
-  if (!channelId) {
-    return [];
-  }
+  const queries = buildLckEnglishQueries(matchupString, teamAName, teamBName, teamAId, teamBId);
+  logDebug("LCK English search", { queries, teamAId, teamBId, teamAName, teamBName });
 
-  const query = buildLckEnglishQuery(matchupString, teamAName, teamBName, teamAId, teamBId);
-  const data = await fetchYouTubeJson("search", {
-    part: "snippet",
-    channelId,
-    type: "video",
-    eventType: "completed",
-    order: "date",
-    maxResults: 10,
-    q: query,
-  });
-  const items = Array.isArray(data?.items) ? data.items : [];
-  const filtered = items.filter((item) => {
-    if (!item?.id?.videoId) {
-      return false;
-    }
-    const hasTeamTokens =
-      Boolean(teamAId || teamAName) && Boolean(teamBId || teamBName);
-    if (hasTeamTokens) {
-      if (
-        !titleMatchesTeams(item?.snippet?.title, teamAId, teamBId, teamAName, teamBName)
-      ) {
+  const filterItems = (items) => {
+    return items.filter((item) => {
+      if (!item?.id?.videoId) {
         return false;
       }
-    } else if (!titleMatchesMatchup(item?.snippet?.title, matchupString)) {
-      return false;
+      const hasTeamTokens =
+        Boolean(teamAId || teamAName) && Boolean(teamBId || teamBName);
+      if (hasTeamTokens) {
+        if (
+          !titleMatchesTeams(item?.snippet?.title, teamAId, teamBId, teamAName, teamBName)
+        ) {
+          return false;
+        }
+      } else if (!titleMatchesMatchup(item?.snippet?.title, matchupString)) {
+        return false;
+      }
+      if (!isLckVodFresh(item?.snippet?.publishedAt, matchStartTime)) {
+        return false;
+      }
+      return true;
+    });
+  };
+
+  const channelId = await fetchLckEnglishChannelId();
+  logDebug("LCK English channelId", channelId || "none");
+
+  const buildLinks = (items) => {
+    const sorted = items.sort((a, b) => {
+      const timeA = new Date(a?.snippet?.publishedAt || 0).getTime();
+      const timeB = new Date(b?.snippet?.publishedAt || 0).getTime();
+      return timeA - timeB;
+    });
+    const limited =
+      Number.isFinite(bestOf) && bestOf > 0 ? sorted.slice(0, bestOf) : sorted;
+    return limited.map((item, index) => {
+      const gameNumber = parseGameNumber(item?.snippet?.title);
+      const hasGameNumber = Number.isFinite(gameNumber);
+      const label =
+        hasGameNumber
+          ? `${LCK_ENGLISH_VOD_LABEL} (Game ${gameNumber})`
+          : limited.length > 1
+            ? `${LCK_ENGLISH_VOD_LABEL} (Part ${index + 1})`
+            : LCK_ENGLISH_VOD_LABEL;
+      return {
+        label,
+        url: `https://www.youtube.com/watch?v=${item.id.videoId}&t=0s`,
+      };
+    });
+  };
+
+  for (const query of queries) {
+    const data = await fetchYouTubeJson("search", {
+      part: "snippet",
+      channelId: channelId || undefined,
+      type: "video",
+      order: "date",
+      maxResults: 15,
+      q: query,
+    });
+    const items = Array.isArray(data?.items) ? data.items : [];
+    logDebug("LCK English results", items.map((item) => item?.snippet?.title).slice(0, 5));
+    const filtered = filterItems(items);
+    const links = buildLinks(filtered);
+    if (links.length) {
+      logDebug("LCK English matched", links.length);
+      return links;
     }
-    return isLckVodFresh(item?.snippet?.publishedAt, matchStartTime);
-  });
+  }
 
-  const sorted = filtered.sort((a, b) => {
-    const timeA = new Date(a?.snippet?.publishedAt || 0).getTime();
-    const timeB = new Date(b?.snippet?.publishedAt || 0).getTime();
-    return timeA - timeB;
-  });
-
-  const limited =
-    Number.isFinite(bestOf) && bestOf > 0 ? sorted.slice(0, bestOf) : sorted;
-  return limited.map((item, index) => {
-    const gameNumber = parseGameNumber(item?.snippet?.title);
-    const labelNumber = Number.isFinite(gameNumber) ? gameNumber : index + 1;
-    return {
-      label: `${LCK_ENGLISH_VOD_LABEL} (Game ${labelNumber})`,
-      url: `https://www.youtube.com/watch?v=${item.id.videoId}&t=0s`,
-    };
-  });
-}
-  const data = await fetchYouTubeJson("search", {
+  const looseQuery = `${teamAId || teamAName} vs ${teamBId || teamBName} LCK`;
+  logDebug("LCK English fallback query", looseQuery);
+  const fallbackData = await fetchYouTubeJson("search", {
     part: "snippet",
-    channelId,
     type: "video",
-    eventType: "completed",
     order: "date",
-    maxResults: 10,
-    q: matchupString,
+    maxResults: 20,
+    q: looseQuery,
   });
-  const items = Array.isArray(data?.items) ? data.items : [];
-  const filtered = items.filter((item) => {
-    if (!item?.id?.videoId) {
-      return false;
-    }
-    if (!titleMatchesMatchup(item?.snippet?.title, matchupString)) {
-      return false;
-    }
-    return isLckVodFresh(item?.snippet?.publishedAt, matchStartTime);
+  const fallbackItems = Array.isArray(fallbackData?.items) ? fallbackData.items : [];
+  logDebug("LCK English fallback results", fallbackItems.map((item) => item?.snippet?.title).slice(0, 5));
+  const englishChannelItems = fallbackItems.filter((item) => {
+    const channelTitle = String(item?.snippet?.channelTitle || "").toLowerCase();
+    return channelTitle.includes("lck") && channelTitle.includes("english");
   });
-
-  const sorted = filtered.sort((a, b) => {
-    const timeA = new Date(a?.snippet?.publishedAt || 0).getTime();
-    const timeB = new Date(b?.snippet?.publishedAt || 0).getTime();
-    return timeA - timeB;
-  });
-
-  const limited =
-    Number.isFinite(bestOf) && bestOf > 0 ? sorted.slice(0, bestOf) : sorted;
-  return limited.map((item, index) => {
-    const gameNumber = parseGameNumber(item?.snippet?.title);
-    const hasGameNumber = Number.isFinite(gameNumber);
-    const label =
-      hasGameNumber
-        ? `${LCK_ENGLISH_VOD_LABEL} (Game ${gameNumber})`
-        : limited.length > 1
-          ? `${LCK_ENGLISH_VOD_LABEL} (Part ${index + 1})`
-          : LCK_ENGLISH_VOD_LABEL;
-    return {
-      label,
-      url: `https://www.youtube.com/watch?v=${item.id.videoId}&t=0s`,
-    };
-  });
+  const fallbackMatches = filterItems(englishChannelItems);
+  logDebug("LCK English fallback matched", fallbackMatches.length);
+  const fallbackLimited =
+    Number.isFinite(bestOf) && bestOf > 0
+      ? fallbackMatches.slice(0, bestOf)
+      : fallbackMatches;
+  return buildLinks(fallbackLimited);
 }
-
 function getMatchupDisplayTeamId(teamId) {
   const resolvedId = resolveTeamId(teamId);
   if (!resolvedId) {
@@ -1032,7 +1204,7 @@ async function hydrateLckVodLinks(container) {
     return;
   }
 
-  const linksByMatchup = new Map();
+  const linksByMatchKey = new Map();
   pendingLinks.forEach((link) => {
     const dayEncoded = link.dataset.lckMatchup || "";
     const matchupDay = decodeURIComponent(dayEncoded);
@@ -1042,84 +1214,109 @@ async function hydrateLckVodLinks(container) {
     const teamBId = decodeURIComponent(link.dataset.lckTeamBId || "");
     const teamAName = decodeURIComponent(link.dataset.lckTeamAName || "");
     const teamBName = decodeURIComponent(link.dataset.lckTeamBName || "");
+    const startTime = Number(link.dataset.lckStartTime);
+    const bestOf = Number(link.dataset.lckBestOf);
     if (!matchupDay) {
       return;
     }
-    if (!linksByMatchup.has(matchupDay)) {
-      linksByMatchup.set(matchupDay, []);
+    const matchKey = `${matchupSingle || matchupDay}::${Number.isFinite(startTime) ? startTime : ""}`;
+    if (!linksByMatchKey.has(matchKey)) {
+      linksByMatchKey.set(matchKey, {
+        matchupDay,
+        matchupSingle,
+        startTime,
+        bestOf,
+        teamAId,
+        teamBId,
+        teamAName,
+        teamBName,
+        links: [],
+      });
     }
-    linksByMatchup.get(matchupDay).push({
-      link,
+    linksByMatchKey.get(matchKey).links.push(link);
+  });
+
+  for (const group of linksByMatchKey.values()) {
+    const {
+      matchupDay,
       matchupSingle,
+      startTime,
+      bestOf,
       teamAId,
       teamBId,
       teamAName,
       teamBName,
-    });
-  });
-
-  for (const [matchupDay, entries] of linksByMatchup) {
+      links,
+    } = group;
     try {
-      for (const entry of entries) {
-        const { link, matchupSingle, teamAId, teamBId, teamAName, teamBName } = entry;
-        const startTime = Number(link.dataset.lckStartTime);
-        const url = await fetchLckVodUrl(matchupDay, startTime);
-        if (url) {
+      const url = await fetchLckVodUrl(matchupDay, startTime);
+      if (url) {
+        links.forEach((link) => {
           link.href = url;
           link.dataset.lckVod = "ready";
-          continue;
-        }
+        });
+        continue;
+      }
 
-        const isRecentMatch =
-          Number.isFinite(startTime) && Math.abs(Date.now() - startTime) <= 24 * 60 * 60 * 1000;
-        if (isRecentMatch) {
-          const liveStartUrl = await fetchLckLiveStartUrl(matchupSingle || matchupDay);
-          if (liveStartUrl) {
+      const isRecentMatch =
+        Number.isFinite(startTime) && Math.abs(Date.now() - startTime) <= 24 * 60 * 60 * 1000;
+      if (isRecentMatch) {
+        const liveStartUrl = await fetchLckLiveStartUrl(matchupSingle || matchupDay);
+        if (liveStartUrl) {
+          links.forEach((link) => {
             link.href = liveStartUrl;
             link.dataset.lckVod = "ready";
-            continue;
-          }
-        }
-
-        const bestOf = Number(link.dataset.lckBestOf);
-        const englishLinks = await fetchLckEnglishVodLinks(
-          matchupSingle || matchupDay,
-          startTime,
-          Number.isFinite(bestOf) ? bestOf : null,
-          teamAId,
-          teamBId,
-          teamAName,
-          teamBName
-        );
-        if (englishLinks.length) {
-          link.href = englishLinks[0].url;
-          link.textContent = englishLinks[0].label;
-          link.dataset.lckVod = "ready";
-          englishLinks.slice(1).forEach((entry) => {
-            const extraLink = document.createElement("a");
-            extraLink.className = "match-link";
-            extraLink.href = entry.url;
-            extraLink.target = "_blank";
-            extraLink.rel = "noopener noreferrer";
-            extraLink.textContent = entry.label;
-            link.parentElement?.appendChild(extraLink);
           });
           continue;
         }
+      }
 
+      const englishLinks = await fetchLckEnglishVodLinks(
+        matchupSingle || matchupDay,
+        startTime,
+        Number.isFinite(bestOf) ? bestOf : null,
+        teamAId,
+        teamBId,
+        teamAName,
+        teamBName
+      );
+      if (englishLinks.length) {
+        const fallbackUrl = englishLinks[0].url;
+        links.forEach((link, index) => {
+          const replacement = englishLinks[index];
+          if (replacement) {
+            link.href = replacement.url;
+            link.textContent = replacement.label;
+          } else {
+            link.href = fallbackUrl;
+          }
+          link.dataset.lckVod = "ready";
+        });
+        continue;
+      }
+
+      links.forEach((link) => {
         link.href = `${LCK_ENGLISH_CHANNEL_URL}`;
         link.textContent = LCK_ENGLISH_VOD_LABEL;
         link.dataset.lckVod = "ready";
-      }
+      });
     } catch (error) {
       console.warn("Failed to hydrate LCK VOD link.", error);
     }
   }
 }
 
+function shouldBypassDirectApi() {
+  return (
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  );
+}
+
 async function fetchJson(path) {
   const url = `${API_BASE}${path}`;
-  const urlsToTry = [url, ...CORS_PROXIES.map((proxy) => `${proxy}${encodeURIComponent(url)}`)];
+  const proxyUrls = CORS_PROXIES.map((proxy) => `${proxy}${encodeURIComponent(url)}`);
+  const urlsToTry = shouldBypassDirectApi() ? proxyUrls : [url, ...proxyUrls];
 
   for (const targetUrl of urlsToTry) {
     try {
@@ -1127,7 +1324,10 @@ async function fetchJson(path) {
       if (!response.ok) {
         throw new Error(`Request failed: ${response.status}`);
       }
-      const data = await response.json();
+      let data = await response.json();
+      if (data && typeof data.contents === "string") {
+        data = JSON.parse(data.contents);
+      }
       setCachedResponse(path, data);
       return data;
     } catch (error) {
@@ -1218,30 +1418,32 @@ function getVodLinks(match, leagueId) {
       const teamAName = resolveTeamName(blueId);
       const teamBName = resolveTeamName(redId);
       const bestOf = Number(match.bestOf);
+      const linkBase = {
+        url: `${LCK_GLOBAL_CHANNEL_URL}/videos`,
+        lckMatchup: matchupString,
+        lckMatchupSingle: singleMatchup,
+        lckTeamAId: blueId,
+        lckTeamBId: redId,
+        lckTeamAName: teamAName,
+        lckTeamBName: teamBName,
+        lckStartTime: Number.isFinite(startTime) ? startTime : null,
+        lckBestOf: Number.isFinite(bestOf) ? bestOf : null,
+      };
+      if (Number.isFinite(bestOf) && bestOf > 1) {
+        return Array.from({ length: bestOf }, (_, index) => ({
+          label: `${LCK_VOD_LABEL} (Game ${index + 1})`,
+          lckGameIndex: index + 1,
+          ...linkBase,
+        }));
+      }
       return [
         {
           label: LCK_VOD_LABEL,
-          url: `${LCK_GLOBAL_CHANNEL_URL}/videos`,
-          lckMatchup: matchupString,
-          lckMatchupSingle: singleMatchup,
-          lckTeamAId: blueId,
-          lckTeamBId: redId,
-          lckTeamAName: teamAName,
-          lckTeamBName: teamBName,
-          lckStartTime: Number.isFinite(startTime) ? startTime : null,
-          lckBestOf: Number.isFinite(bestOf) ? bestOf : null,
+          lckGameIndex: 1,
+          ...linkBase,
         },
       ];
     }
-  }
-
-  if (match.vod) {
-    return [
-      {
-        label: "Official VOD",
-        url: match.vod,
-      },
-    ];
   }
 
   const blueId = match.blueTeamId || match.blueTeam?.id;
@@ -1251,16 +1453,19 @@ function getVodLinks(match, leagueId) {
   const leagueName = resolveLeagueName(leagueId);
   const startTime = normalizeStartTime(getMatchStartValue(match));
   const dateLabel = startTime ? formatDayLabel(startTime) : "";
+  const bestOf = Number(match.bestOf);
+  const gameCount = Number.isFinite(bestOf) && bestOf > 1 ? bestOf : 1;
 
-  const query = [leagueName, teamA, teamB, dateLabel, "full game"]
-    .filter(Boolean)
-    .join(" ");
-  return [
-    {
-      label: "YouTube replay search",
+  return Array.from({ length: gameCount }, (_, index) => {
+    const gameNumber = index + 1;
+    const query = [leagueName, teamA, teamB, dateLabel, `game ${gameNumber}`]
+      .filter(Boolean)
+      .join(" ");
+    return {
+      label: `YouTube replay search (Game ${gameNumber})`,
       url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
-    },
-  ];
+    };
+  });
 }
 
 async function fetchLeagueHasData(leagueId) {
@@ -1384,6 +1589,9 @@ function buildMatchCard(match, leagueId, isLive) {
               const lckBestOfAttr = Number.isFinite(link.lckBestOf)
                 ? ` data-lck-best-of="${link.lckBestOf}"`
                 : "";
+              const lckGameIndexAttr = Number.isFinite(link.lckGameIndex)
+                ? ` data-lck-game-index="${link.lckGameIndex}"`
+                : "";
               const lckTeamAIdAttr = link.lckTeamAId
                 ? ` data-lck-team-a-id="${encodeURIComponent(link.lckTeamAId)}"`
                 : "";
@@ -1400,7 +1608,7 @@ function buildMatchCard(match, leagueId, isLive) {
                 ? ' data-lck-live-start="pending"'
                 : "";
               return `
-                <a class="match-link" href="${link.url}" target="_blank" rel="noopener noreferrer"${lckAttrs}${lckSingleAttrs}${lckStartAttr}${lckBestOfAttr}${lckTeamAIdAttr}${lckTeamBIdAttr}${lckTeamANameAttr}${lckTeamBNameAttr}${lckLiveAttrs}>
+                <a class="match-link" href="${link.url}" target="_blank" rel="noopener noreferrer"${lckAttrs}${lckSingleAttrs}${lckStartAttr}${lckBestOfAttr}${lckGameIndexAttr}${lckTeamAIdAttr}${lckTeamBIdAttr}${lckTeamANameAttr}${lckTeamBNameAttr}${lckLiveAttrs}>
                   ${link.label}
                 </a>
               `;
@@ -1947,6 +2155,13 @@ function filterLeaguesByData(leagues, dataCache) {
   return leagues.filter((league) => dataCache[league.leagueId] === true);
 }
 
+function shouldRecheckLeague(leagueId, cachedValue) {
+  if (cachedValue === undefined || cachedValue === null) {
+    return true;
+  }
+  return cachedValue === false && MAIN_LEAGUE_IDS.includes(leagueId);
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -2043,12 +2258,12 @@ async function refreshLeaguesWithData(leagues) {
   }
 
   leagueDataRefreshInFlight = true;
+  setStatus(LEAGUE_CHECKING_MESSAGE);
   try {
     const cached = getLeagueDataCache();
     const dataCache = cached?.data ? { ...cached.data } : {};
-    const toCheck = sortLeaguesForCheck(leagues).filter(
-      (league) =>
-        dataCache[league.leagueId] === undefined || dataCache[league.leagueId] === null
+    const toCheck = sortLeaguesForCheck(leagues).filter((league) =>
+      shouldRecheckLeague(league.leagueId, dataCache[league.leagueId])
     );
 
     if (toCheck.length) {
@@ -2167,6 +2382,7 @@ function pickDefaultLeague(leagues) {
 }
 
 async function init() {
+  setStatus("Starting app...");
   viewButtons.forEach((button) => {
     button.addEventListener("click", () => {
       setView(button.dataset.view);
