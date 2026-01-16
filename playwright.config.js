@@ -8,7 +8,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
   },
   webServer: {
-    command: "python -m http.server 5173",
+    command: "npx http-server -c-1 -p 5173",
     url: "http://127.0.0.1:5173",
     reuseExistingServer: !process.env.CI,
   },

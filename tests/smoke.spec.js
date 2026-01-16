@@ -52,6 +52,14 @@ test("renders the schedule with mocked data", async ({ page }) => {
     });
   });
 
+  await page.route("https://api.twitch.tv/helix/streams?user_login=caedrel", async (route) => {
+    await route.fulfill({
+      json: {
+        data: [{ id: "123", user_name: "Caedrel", type: "live" }],
+      },
+    });
+  });
+
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "LoL Esports Schedule" })).toBeVisible();
@@ -61,7 +69,7 @@ test("renders the schedule with mocked data", async ({ page }) => {
   const watchLinks = page.locator(".match-actions .match-link");
   await expect(watchLinks).toHaveCount(2);
   await expect(watchLinks.nth(0)).toHaveText("Official live");
-  await expect(watchLinks.nth(1)).toHaveText("Caedrel co-stream (if live)");
+  await expect(watchLinks.nth(1)).toHaveText("Caedrel co-stream");
 
   const logo = page.locator(".team-logo").first();
   await expect(logo).toHaveCSS("background-image", /assets\/logos\/T1\.svg/);

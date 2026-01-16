@@ -1,6 +1,164 @@
 const API_BASE = "https://api.lol-esports.mckernant1.com";
+const APP_CONFIG = window.APP_CONFIG || {};
+const TWITCH_CLIENT_ID = APP_CONFIG.twitchClientId || "";
+const TWITCH_ACCESS_TOKEN = APP_CONFIG.twitchAccessToken || "";
+const TWITCH_STREAMER_LOGIN = APP_CONFIG.twitchStreamerLogin || "caedrel";
 const PRIORITY_EVENT_IDS = ["MSI", "WCS", "FST", "FS"];
-const MAJOR_LEAGUE_IDS = ["LCK", "LEC", "LPL", "LCS"];
+const MAJOR_LEAGUE_IDS = ["LCK", "LPL", "LCS", "LEC"];
+const MAIN_LEAGUE_IDS = [
+  "LCK",
+  "LPL",
+  "LCS",
+  "LEC",
+  "LoL_EMEA_Championship",
+  "MSI",
+  "WCS",
+  "FST",
+  "FS",
+];
+const LIKELY_LEAGUE_IDS = [
+  "2015_ASE",
+  "AC",
+  "AG",
+  "AG_2018",
+  "AG_2022",
+  "AL",
+  "AL2",
+  "AOL",
+  "ASCI",
+  "ASI",
+  "All-Star",
+  "Asia_Master",
+  "BGL",
+  "BIG",
+  "BL",
+  "BM",
+  "BOTA",
+  "BP",
+  "BRCC",
+  "BRMA",
+  "BRMC",
+  "CBLOL",
+  "CBLOL.A",
+  "CD",
+  "CDF",
+  "CDLN",
+  "CDLS",
+  "CIS_CL",
+  "CK",
+  "CLS",
+  "CSL",
+  "CU",
+  "DC",
+  "DL",
+  "EBL",
+  "EBL2021_Pro-Am",
+  "ECS",
+  "EGL",
+  "EL",
+  "EM",
+  "EPL",
+  "ES",
+  "ESLOL",
+  "ESM",
+  "EU_LCS",
+  "EWC",
+  "GL",
+  "GLL",
+  "GLL20_ProAm",
+  "GPL",
+  "GSG",
+  "HC",
+  "HLL",
+  "HM",
+  "HW",
+  "IC",
+  "IWCQ",
+  "KeG",
+  "KeSPA",
+  "LAS",
+  "LASA",
+  "LCK_CL",
+  "LCL",
+  "LCO",
+  "LCP",
+  "LCPW",
+  "LCP_Wildcard",
+  "LCS.A",
+  "LDL",
+  "LFL",
+  "LFL2",
+  "LGL",
+  "LHE",
+  "LIT",
+  "LJL",
+  "LJLA",
+  "LJLCS",
+  "LJL_SG",
+  "LLA",
+  "LLN",
+  "LMF",
+  "LMS",
+  "LPLOL",
+  "LSC",
+  "LST",
+  "LTA",
+  "LTA_N",
+  "LTA_S",
+  "LVPSL",
+  "LVP_DDH",
+  "Legends_Ascend_South_Asia",
+  "MSC",
+  "NACL",
+  "NASG",
+  "NERD",
+  "NEST",
+  "NEXO",
+  "NLC",
+  "NLC_Aurora_Open",
+  "OCS",
+  "OPL",
+  "OTBLX",
+  "Origin",
+  "PCL",
+  "PCS",
+  "PEF",
+  "PGN",
+  "PRM",
+  "Prime_Pokal",
+  "Proving_Grounds_Circuit",
+  "RCL",
+  "ROL",
+  "RR",
+  "SEA",
+  "SL",
+  "SLL",
+  "SLO",
+  "TAL",
+  "TCS",
+  "TFPP",
+  "TRA",
+  "TSC",
+  "UGP",
+  "UKLC",
+  "UL",
+  "UL2",
+  "UPL",
+  "Ultraliga_Super_Puchar",
+  "VCS",
+  "VL",
+];
+const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
+const YOUTUBE_API_KEY = APP_CONFIG.youtubeApiKey || "";
+const YOUTUBE_API_KEY_STORAGE_KEY = "lolScheduleYouTubeApiKey";
+const LCK_GLOBAL_HANDLE = "@LCKglobal";
+const LCK_GLOBAL_CHANNEL_URL = "https://www.youtube.com/@LCKglobal";
+const LCK_ENGLISH_HANDLE = "@LCK_English";
+const LCK_ENGLISH_CHANNEL_URL = "https://www.youtube.com/@LCK_English";
+const LCK_VOD_LABEL = "Official LCK Global VOD";
+const LCK_LIVE_START_LABEL = "Official live (from start)";
+const LCK_ENGLISH_VOD_LABEL = "LCK English VOD";
+
 const STREAMS_BY_LEAGUE_ID = {
   LCK: {
     official: "https://www.youtube.com/@LCKglobal/live",
@@ -81,9 +239,12 @@ const TEAM_ID_ALIASES = {
   BRION: "BRO",
   BFX: "FOX",
 };
+const TEAM_DISPLAY_ID_OVERRIDES = {
+  FOX: "BFX",
+};
 const CORS_PROXIES = [
-  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  "https://corsproxy.io/?",
+  "https://api.allorigins.win/raw?url=",
 ];
 const RESPONSE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_DATA = {
@@ -135,41 +296,35 @@ const FALLBACK_DATA = {
     { teamId: "UP", name: "Ultra Prime" },
   ],
 };
-const CORS_PROXIES = [
-  "https://corsproxy.io/?",
-  "https://cors.isomorphic-git.org/",
-];
-const RESPONSE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const FALLBACK_DATA = {
-  "/leagues": [
-    { leagueId: "LCK", leagueName: "LCK", isOfficial: true, level: "primary" },
-    { leagueId: "LEC", leagueName: "LEC", isOfficial: true, level: "primary" },
-    { leagueId: "LPL", leagueName: "LPL", isOfficial: true, level: "primary" },
-    { leagueId: "LCS", leagueName: "LCS", isOfficial: true, level: "primary" },
-    { leagueId: "MSI", leagueName: "MSI", isOfficial: true, level: "primary" },
-    { leagueId: "WCS", leagueName: "Worlds", isOfficial: true, level: "primary" },
-  ],
-  "/teams": [
-    { teamId: "T1", name: "T1" },
-    { teamId: "GEN", name: "Gen.G" },
-    { teamId: "DK", name: "Dplus KIA" },
-    { teamId: "HLE", name: "Hanwha Life Esports" },
-    { teamId: "KT", name: "KT Rolster" },
-    { teamId: "DRX", name: "DRX" },
-    { teamId: "KDF", name: "Kwangdong Freecs" },
-    { teamId: "NS", name: "Nongshim RedForce" },
-    { teamId: "BRO", name: "OKSavingsBank BRION" },
-    { teamId: "FOX", name: "FearX" },
-  ],
-};
 const LIVE_WINDOW_MS = 3 * 60 * 60 * 1000;
+const RECENT_MATCH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const PREVIOUS_LIMIT = 10;
 const LEAGUE_STORAGE_KEY = "lolScheduleLeagueId";
-const LEAGUE_DATA_CACHE_KEY = "lolScheduleLeagueDataCache";
+const LEAGUE_PREFERENCES_KEY = "lolSchedulePreferredLeagues";
+const LEAGUE_CATALOG_KEY = "lolScheduleLeagueCatalog";
+const LEAGUE_DATA_CACHE_KEY = "lolScheduleLeagueDataCache:v3";
 const LEAGUE_DATA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const TWITCH_STATUS_TTL_MS = 2 * 60 * 1000;
+const LEAGUE_REFRESH_DELAY_MS = 1500;
+const LEAGUE_REFRESH_STEP_DELAY_MS = 1000;
+const LEAGUE_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+const LEAGUE_REFRESH_MAX_CHECKS = 20;
+const LEAGUE_BUCKETS_KEY = "lolScheduleLeagueBuckets";
+const LEAGUE_CHECKING_MESSAGE = "Checking leagues for match data...";
+
+const lckVodCache = new Map();
+let lckChannelIdKey = null;
+let lckChannelIdPromise = null;
+let lckChannelIdValue = null;
+let leagueDataRefreshScheduled = false;
+let leagueDataRefreshInFlight = false;
+let leagueRefreshInterval = null;
+const lckLiveStartCache = new Map();
+const lckLiveStartPromises = new Map();
 
 const state = {
   leagues: [],
+  leagueCatalog: [],
   teamsById: new Map(),
   leaguesById: new Map(),
   matches: [],
@@ -177,6 +332,13 @@ const state = {
   currentTournamentId: null,
   view: "schedule",
   showPrevious: false,
+  caedrelLive: null,
+  lastTwitchCheck: 0,
+  leagueBuckets: {
+    withData: new Set(),
+    likelyNoData: new Set(),
+    unlikelyNoData: new Set(),
+  },
 };
 
 const leagueSelect = document.getElementById("leagueSelect");
@@ -185,10 +347,31 @@ const matchesEl = document.getElementById("matches");
 const tableEl = document.getElementById("table");
 const previousEl = document.getElementById("previous");
 const previousToggle = document.getElementById("previousToggle");
+const leagueFilter = document.getElementById("leagueFilter");
+const saveLeagueButton = document.getElementById("saveLeague");
+const leagueOptionsList = document.getElementById("leagueOptions");
 const viewButtons = Array.from(document.querySelectorAll(".view-button"));
+const loadingIndicator = document.getElementById("loadingIndicator");
+let loadingCount = 0;
 
 function setStatus(message) {
   statusEl.textContent = message;
+}
+
+function setLoading(isLoading) {
+  if (!loadingIndicator) {
+    return;
+  }
+
+  if (isLoading) {
+    loadingCount += 1;
+  } else {
+    loadingCount = Math.max(loadingCount - 1, 0);
+  }
+
+  const isActive = loadingCount > 0;
+  loadingIndicator.classList.toggle("is-active", isActive);
+  loadingIndicator.setAttribute("aria-hidden", isActive ? "false" : "true");
 }
 
 function renderEmpty(targetEl, message) {
@@ -383,6 +566,557 @@ function setCachedResponse(path, data) {
   }
 }
 
+function getYouTubeApiKey() {
+  try {
+    const stored = localStorage.getItem(YOUTUBE_API_KEY_STORAGE_KEY);
+    if (stored) {
+      return stored;
+    }
+  } catch (error) {
+    // Ignore storage errors and fall back to the inline key.
+  }
+  return YOUTUBE_API_KEY;
+}
+
+async function fetchYouTubeJson(endpoint, params) {
+  try {
+    const apiKey = getYouTubeApiKey();
+    if (!apiKey) {
+      return null;
+    }
+    const url = new URL(`${YOUTUBE_API_BASE}/${endpoint}`);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== "") {
+        url.searchParams.set(key, String(value));
+      }
+    });
+    url.searchParams.set("key", apiKey);
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`YouTube request failed: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.warn("Unable to fetch YouTube data.", error);
+    return null;
+  }
+}
+
+async function fetchLckGlobalChannelId() {
+  const apiKey = getYouTubeApiKey();
+  if (!apiKey) {
+    return null;
+  }
+  if (lckChannelIdValue && lckChannelIdKey === apiKey) {
+    return lckChannelIdValue;
+  }
+  if (lckChannelIdPromise && lckChannelIdKey === apiKey) {
+    return lckChannelIdPromise;
+  }
+
+  lckChannelIdKey = apiKey;
+  lckChannelIdPromise = (async () => {
+    const data = await fetchYouTubeJson("channels", {
+      part: "id",
+      forHandle: LCK_GLOBAL_HANDLE,
+    });
+    const channelId = data?.items?.[0]?.id || null;
+    lckChannelIdValue = channelId;
+    return channelId;
+  })();
+  return lckChannelIdPromise;
+}
+
+function normalizeMatchupText(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim();
+}
+
+function buildTeamMatchTokens(teamId, teamName) {
+  const tokens = new Set();
+  const normalizedId = normalizeMatchupText(teamId);
+  const normalizedName = normalizeMatchupText(teamName);
+  if (normalizedId) {
+    tokens.add(normalizedId);
+  }
+  if (normalizedName) {
+    tokens.add(normalizedName);
+    tokens.add(normalizedName.replace(/\s+/g, ""));
+    const parts = normalizedName.split(" ").filter(Boolean);
+    if (parts.length > 1) {
+      tokens.add(parts[0]);
+      tokens.add(parts[parts.length - 1]);
+    }
+  }
+  return tokens;
+}
+
+function titleMatchesTeams(title, teamAId, teamBId, teamAName, teamBName) {
+  if (!title) {
+    return false;
+  }
+  const titleNormalized = normalizeMatchupText(title);
+  const teamATokens = buildTeamMatchTokens(teamAId, teamAName);
+  const teamBTokens = buildTeamMatchTokens(teamBId, teamBName);
+  const matchesTeamA = Array.from(teamATokens).some((token) =>
+    token ? titleNormalized.includes(token) : false
+  );
+  const matchesTeamB = Array.from(teamBTokens).some((token) =>
+    token ? titleNormalized.includes(token) : false
+  );
+  return matchesTeamA && matchesTeamB;
+}
+function getLckVodCacheKey(matchupString, matchStartTime) {
+  const keyTime = Number.isFinite(matchStartTime) ? String(matchStartTime) : "unknown";
+  return `${matchupString}::${keyTime}`;
+}
+
+function isLckVodFresh(publishedAt, matchStartTime) {
+  if (!publishedAt || !Number.isFinite(matchStartTime)) {
+    return true;
+  }
+  const publishedTime = new Date(publishedAt).getTime();
+  if (!Number.isFinite(publishedTime)) {
+    return false;
+  }
+  const diffMs = Math.abs(publishedTime - matchStartTime);
+  return diffMs <= 24 * 60 * 60 * 1000;
+}
+
+async function fetchLckVodVideoId(matchupString, matchStartTime) {
+  const channelId = await fetchLckGlobalChannelId();
+  if (!channelId) {
+    return null;
+  }
+
+  const primary = await fetchYouTubeJson("search", {
+    part: "snippet",
+    channelId,
+    type: "video",
+    eventType: "completed",
+    order: "date",
+    maxResults: 5,
+    q: matchupString,
+  });
+  const primaryItems = Array.isArray(primary?.items) ? primary.items : [];
+  const primaryMatch = primaryItems.find((item) => {
+    return isLckVodFresh(item?.snippet?.publishedAt, matchStartTime);
+  });
+  if (primaryMatch?.id?.videoId) {
+    return primaryMatch.id.videoId;
+  }
+
+  const parts = matchupString
+    .split(" - ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const fallback = await fetchYouTubeJson("search", {
+    part: "snippet",
+    channelId,
+    type: "video",
+    eventType: "completed",
+    order: "date",
+    maxResults: 5,
+    q: parts[0],
+  });
+  const fallbackItems = Array.isArray(fallback?.items) ? fallback.items : [];
+  const requiredParts = parts.slice(1).map((part) => normalizeMatchupText(part));
+  const candidate = fallbackItems.find((item) => {
+    if (!item?.id?.videoId || !item?.snippet?.title) {
+      return false;
+    }
+    const titleNormalized = normalizeMatchupText(item.snippet.title);
+    const isValid = requiredParts.every((part) => part && titleNormalized.includes(part));
+    if (!isValid) {
+      return false;
+    }
+    return isLckVodFresh(item?.snippet?.publishedAt, matchStartTime);
+  });
+  return candidate?.id?.videoId || null;
+}
+
+async function fetchLckVodUrl(matchupString, matchStartTime) {
+  const cacheKey = getLckVodCacheKey(matchupString, matchStartTime);
+  if (lckVodCache.has(cacheKey)) {
+    return lckVodCache.get(cacheKey);
+  }
+
+  const videoId = await fetchLckVodVideoId(matchupString, matchStartTime);
+  const url = videoId ? `https://www.youtube.com/watch?v=${videoId}&t=0s` : null;
+  lckVodCache.set(cacheKey, url);
+  return url;
+}
+
+function titleMatchesMatchup(title, matchupString) {
+  if (!title || !matchupString) {
+    return false;
+  }
+  const titleNormalized = normalizeMatchupText(title);
+  const requiredParts = matchupString
+    .split(" - ")
+    .map((part) => normalizeMatchupText(part))
+    .filter(Boolean);
+  return requiredParts.every((part) => titleNormalized.includes(part));
+}
+
+async function fetchLckLiveVideo(matchupString) {
+  const channelId = await fetchLckGlobalChannelId();
+  if (!channelId) {
+    return null;
+  }
+
+  const data = await fetchYouTubeJson("search", {
+    part: "snippet",
+    channelId,
+    type: "video",
+    eventType: "live",
+    order: "date",
+    maxResults: 5,
+  });
+  const items = Array.isArray(data?.items) ? data.items : [];
+  if (!matchupString) {
+    return items[0] || null;
+  }
+  return (
+    items.find((item) => titleMatchesMatchup(item?.snippet?.title, matchupString)) || null
+  );
+}
+
+async function fetchLckLiveStartUrl(matchupString) {
+  const cacheKey = matchupString || "generic";
+  if (lckLiveStartCache.has(cacheKey)) {
+    return lckLiveStartCache.get(cacheKey);
+  }
+  if (lckLiveStartPromises.has(cacheKey)) {
+    return lckLiveStartPromises.get(cacheKey);
+  }
+
+  const promise = (async () => {
+    const liveVideo = await fetchLckLiveVideo(matchupString);
+    const videoId = liveVideo?.id?.videoId;
+    const url = videoId ? `https://www.youtube.com/watch?v=${videoId}&t=0s` : null;
+    if (url) {
+      lckLiveStartCache.set(cacheKey, url);
+    }
+    lckLiveStartPromises.delete(cacheKey);
+    return url;
+  })();
+  lckLiveStartPromises.set(cacheKey, promise);
+  return promise;
+}
+
+async function hydrateLckLiveStartLinks(container) {
+  const apiKey = getYouTubeApiKey();
+  if (!apiKey || !container) {
+    return;
+  }
+
+  const pendingLinks = Array.from(
+    container.querySelectorAll('a[data-lck-live-start="pending"]')
+  );
+  if (!pendingLinks.length) {
+    return;
+  }
+
+  const url = await fetchLckLiveStartUrl(null);
+  if (!url) {
+    return;
+  }
+
+  pendingLinks.forEach((link) => {
+    link.href = url;
+    link.dataset.lckLiveStart = "ready";
+  });
+}
+
+async function fetchLckEnglishChannelId() {
+  const apiKey = getYouTubeApiKey();
+  if (!apiKey) {
+    return null;
+  }
+  const data = await fetchYouTubeJson("channels", {
+    part: "id",
+    forHandle: LCK_ENGLISH_HANDLE,
+  });
+  return data?.items?.[0]?.id || null;
+}
+
+function parseGameNumber(title) {
+  const match = String(title || "").match(/(?:game|match|set)\s*(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+function buildLckEnglishQuery(matchupString, teamAName, teamBName, teamAId, teamBId) {
+  if (teamAName && teamBName) {
+    return `${teamAName} vs ${teamBName}`;
+  }
+  if (teamAId && teamBId) {
+    return `${teamAId} vs ${teamBId}`;
+  }
+  return matchupString;
+}
+
+async function fetchLckEnglishVodLinks(
+  matchupString,
+  matchStartTime,
+  bestOf,
+  teamAId,
+  teamBId,
+  teamAName,
+  teamBName
+) {
+  const channelId = await fetchLckEnglishChannelId();
+  if (!channelId) {
+    return [];
+  }
+
+  const query = buildLckEnglishQuery(matchupString, teamAName, teamBName, teamAId, teamBId);
+  const data = await fetchYouTubeJson("search", {
+    part: "snippet",
+    channelId,
+    type: "video",
+    eventType: "completed",
+    order: "date",
+    maxResults: 10,
+    q: query,
+  });
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const filtered = items.filter((item) => {
+    if (!item?.id?.videoId) {
+      return false;
+    }
+    const hasTeamTokens =
+      Boolean(teamAId || teamAName) && Boolean(teamBId || teamBName);
+    if (hasTeamTokens) {
+      if (
+        !titleMatchesTeams(item?.snippet?.title, teamAId, teamBId, teamAName, teamBName)
+      ) {
+        return false;
+      }
+    } else if (!titleMatchesMatchup(item?.snippet?.title, matchupString)) {
+      return false;
+    }
+    return isLckVodFresh(item?.snippet?.publishedAt, matchStartTime);
+  });
+
+  const sorted = filtered.sort((a, b) => {
+    const timeA = new Date(a?.snippet?.publishedAt || 0).getTime();
+    const timeB = new Date(b?.snippet?.publishedAt || 0).getTime();
+    return timeA - timeB;
+  });
+
+  const limited =
+    Number.isFinite(bestOf) && bestOf > 0 ? sorted.slice(0, bestOf) : sorted;
+  return limited.map((item, index) => {
+    const gameNumber = parseGameNumber(item?.snippet?.title);
+    const labelNumber = Number.isFinite(gameNumber) ? gameNumber : index + 1;
+    return {
+      label: `${LCK_ENGLISH_VOD_LABEL} (Game ${labelNumber})`,
+      url: `https://www.youtube.com/watch?v=${item.id.videoId}&t=0s`,
+    };
+  });
+}
+  const data = await fetchYouTubeJson("search", {
+    part: "snippet",
+    channelId,
+    type: "video",
+    eventType: "completed",
+    order: "date",
+    maxResults: 10,
+    q: matchupString,
+  });
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const filtered = items.filter((item) => {
+    if (!item?.id?.videoId) {
+      return false;
+    }
+    if (!titleMatchesMatchup(item?.snippet?.title, matchupString)) {
+      return false;
+    }
+    return isLckVodFresh(item?.snippet?.publishedAt, matchStartTime);
+  });
+
+  const sorted = filtered.sort((a, b) => {
+    const timeA = new Date(a?.snippet?.publishedAt || 0).getTime();
+    const timeB = new Date(b?.snippet?.publishedAt || 0).getTime();
+    return timeA - timeB;
+  });
+
+  const limited =
+    Number.isFinite(bestOf) && bestOf > 0 ? sorted.slice(0, bestOf) : sorted;
+  return limited.map((item, index) => {
+    const gameNumber = parseGameNumber(item?.snippet?.title);
+    const hasGameNumber = Number.isFinite(gameNumber);
+    const label =
+      hasGameNumber
+        ? `${LCK_ENGLISH_VOD_LABEL} (Game ${gameNumber})`
+        : limited.length > 1
+          ? `${LCK_ENGLISH_VOD_LABEL} (Part ${index + 1})`
+          : LCK_ENGLISH_VOD_LABEL;
+    return {
+      label,
+      url: `https://www.youtube.com/watch?v=${item.id.videoId}&t=0s`,
+    };
+  });
+}
+
+function getMatchupDisplayTeamId(teamId) {
+  const resolvedId = resolveTeamId(teamId);
+  if (!resolvedId) {
+    return "TBD";
+  }
+  return TEAM_DISPLAY_ID_OVERRIDES[resolvedId] || resolvedId;
+}
+
+function getLckDayKey(timestamp) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function buildLckMatchupString(match) {
+  const startTime = normalizeStartTime(getMatchStartValue(match));
+  if (!startTime) {
+    return null;
+  }
+  const dayKey = getLckDayKey(startTime);
+  const dayMatches = state.matches.filter((item) => {
+    const itemStart = normalizeStartTime(getMatchStartValue(item));
+    return itemStart && getLckDayKey(itemStart) === dayKey;
+  });
+
+  const sortedDayMatches = [...dayMatches].sort(
+    (a, b) =>
+      normalizeStartTime(getMatchStartValue(a)) - normalizeStartTime(getMatchStartValue(b))
+  );
+  const matchupParts = sortedDayMatches
+    .map((item) => {
+      const blueId = item.blueTeamId || item.blueTeam?.id;
+      const redId = item.redTeamId || item.redTeam?.id;
+      if (!blueId || !redId) {
+        return null;
+      }
+      return `${getMatchupDisplayTeamId(blueId)} vs ${getMatchupDisplayTeamId(redId)}`;
+    })
+    .filter(Boolean);
+
+  return matchupParts.length ? matchupParts.join(" - ") : null;
+}
+
+function buildLckSingleMatchupString(match) {
+  const blueId = match.blueTeamId || match.blueTeam?.id;
+  const redId = match.redTeamId || match.redTeam?.id;
+  if (!blueId || !redId) {
+    return null;
+  }
+  return `${getMatchupDisplayTeamId(blueId)} vs ${getMatchupDisplayTeamId(redId)}`;
+}
+
+async function hydrateLckVodLinks(container) {
+  const apiKey = getYouTubeApiKey();
+  if (!apiKey || !container) {
+    return;
+  }
+
+  const pendingLinks = Array.from(container.querySelectorAll('a[data-lck-vod="pending"]'));
+  if (!pendingLinks.length) {
+    return;
+  }
+
+  const linksByMatchup = new Map();
+  pendingLinks.forEach((link) => {
+    const dayEncoded = link.dataset.lckMatchup || "";
+    const matchupDay = decodeURIComponent(dayEncoded);
+    const singleEncoded = link.dataset.lckMatchupSingle || "";
+    const matchupSingle = decodeURIComponent(singleEncoded);
+    const teamAId = decodeURIComponent(link.dataset.lckTeamAId || "");
+    const teamBId = decodeURIComponent(link.dataset.lckTeamBId || "");
+    const teamAName = decodeURIComponent(link.dataset.lckTeamAName || "");
+    const teamBName = decodeURIComponent(link.dataset.lckTeamBName || "");
+    if (!matchupDay) {
+      return;
+    }
+    if (!linksByMatchup.has(matchupDay)) {
+      linksByMatchup.set(matchupDay, []);
+    }
+    linksByMatchup.get(matchupDay).push({
+      link,
+      matchupSingle,
+      teamAId,
+      teamBId,
+      teamAName,
+      teamBName,
+    });
+  });
+
+  for (const [matchupDay, entries] of linksByMatchup) {
+    try {
+      for (const entry of entries) {
+        const { link, matchupSingle, teamAId, teamBId, teamAName, teamBName } = entry;
+        const startTime = Number(link.dataset.lckStartTime);
+        const url = await fetchLckVodUrl(matchupDay, startTime);
+        if (url) {
+          link.href = url;
+          link.dataset.lckVod = "ready";
+          continue;
+        }
+
+        const isRecentMatch =
+          Number.isFinite(startTime) && Math.abs(Date.now() - startTime) <= 24 * 60 * 60 * 1000;
+        if (isRecentMatch) {
+          const liveStartUrl = await fetchLckLiveStartUrl(matchupSingle || matchupDay);
+          if (liveStartUrl) {
+            link.href = liveStartUrl;
+            link.dataset.lckVod = "ready";
+            continue;
+          }
+        }
+
+        const bestOf = Number(link.dataset.lckBestOf);
+        const englishLinks = await fetchLckEnglishVodLinks(
+          matchupSingle || matchupDay,
+          startTime,
+          Number.isFinite(bestOf) ? bestOf : null,
+          teamAId,
+          teamBId,
+          teamAName,
+          teamBName
+        );
+        if (englishLinks.length) {
+          link.href = englishLinks[0].url;
+          link.textContent = englishLinks[0].label;
+          link.dataset.lckVod = "ready";
+          englishLinks.slice(1).forEach((entry) => {
+            const extraLink = document.createElement("a");
+            extraLink.className = "match-link";
+            extraLink.href = entry.url;
+            extraLink.target = "_blank";
+            extraLink.rel = "noopener noreferrer";
+            extraLink.textContent = entry.label;
+            link.parentElement?.appendChild(extraLink);
+          });
+          continue;
+        }
+
+        link.href = `${LCK_ENGLISH_CHANNEL_URL}`;
+        link.textContent = LCK_ENGLISH_VOD_LABEL;
+        link.dataset.lckVod = "ready";
+      }
+    } catch (error) {
+      console.warn("Failed to hydrate LCK VOD link.", error);
+    }
+  }
+}
+
 async function fetchJson(path) {
   const url = `${API_BASE}${path}`;
   const urlsToTry = [url, ...CORS_PROXIES.map((proxy) => `${proxy}${encodeURIComponent(url)}`)];
@@ -424,21 +1158,90 @@ function getLiveLinks(leagueId) {
       url: streamInfo.official,
     },
   ];
-  if (streamInfo.coStream) {
+  if (streamInfo.coStream && state.caedrelLive !== false) {
     links.push({
-      label: "Caedrel co-stream (if live)",
+      label: "Caedrel co-stream",
       url: streamInfo.coStream,
+    });
+  }
+  if (leagueId === "LCK" && getYouTubeApiKey()) {
+    links.push({
+      label: LCK_LIVE_START_LABEL,
+      url: `${LCK_GLOBAL_CHANNEL_URL}/live`,
+      lckLiveStart: true,
     });
   }
   return links;
 }
 
-function getVodLink(match, leagueId) {
+async function refreshCaedrelStatus() {
+  if (!TWITCH_CLIENT_ID || !TWITCH_ACCESS_TOKEN) {
+    state.caedrelLive = null;
+    return;
+  }
+
+  const now = Date.now();
+  if (state.lastTwitchCheck && now - state.lastTwitchCheck < TWITCH_STATUS_TTL_MS) {
+    return;
+  }
+
+  state.lastTwitchCheck = now;
+  try {
+    const response = await fetch(
+      `https://api.twitch.tv/helix/streams?user_login=${TWITCH_STREAMER_LOGIN}`,
+      {
+        headers: {
+          "Client-ID": TWITCH_CLIENT_ID,
+          Authorization: `Bearer ${TWITCH_ACCESS_TOKEN}`,
+        },
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Twitch request failed: ${response.status}`);
+    }
+    const data = await response.json();
+    state.caedrelLive = Array.isArray(data?.data) && data.data.length > 0;
+  } catch (error) {
+    console.warn("Unable to check Twitch live status.", error);
+    state.caedrelLive = null;
+  }
+}
+
+function getVodLinks(match, leagueId) {
+  if (leagueId === "LCK") {
+    const matchupString = buildLckMatchupString(match);
+    if (matchupString) {
+      const startTime = normalizeStartTime(getMatchStartValue(match));
+      const singleMatchup = buildLckSingleMatchupString(match);
+      const blueId = match.blueTeamId || match.blueTeam?.id;
+      const redId = match.redTeamId || match.redTeam?.id;
+      const teamAName = resolveTeamName(blueId);
+      const teamBName = resolveTeamName(redId);
+      const bestOf = Number(match.bestOf);
+      return [
+        {
+          label: LCK_VOD_LABEL,
+          url: `${LCK_GLOBAL_CHANNEL_URL}/videos`,
+          lckMatchup: matchupString,
+          lckMatchupSingle: singleMatchup,
+          lckTeamAId: blueId,
+          lckTeamBId: redId,
+          lckTeamAName: teamAName,
+          lckTeamBName: teamBName,
+          lckStartTime: Number.isFinite(startTime) ? startTime : null,
+          lckBestOf: Number.isFinite(bestOf) ? bestOf : null,
+        },
+      ];
+    }
+  }
+
   if (match.vod) {
-    return {
-      label: "Official VOD",
-      url: match.vod,
-    };
+    return [
+      {
+        label: "Official VOD",
+        url: match.vod,
+      },
+    ];
   }
 
   const blueId = match.blueTeamId || match.blueTeam?.id;
@@ -452,10 +1255,12 @@ function getVodLink(match, leagueId) {
   const query = [leagueName, teamA, teamB, dateLabel, "full game"]
     .filter(Boolean)
     .join(" ");
-  return {
-    label: "YouTube replay search",
-    url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
-  };
+  return [
+    {
+      label: "YouTube replay search",
+      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+    },
+  ];
 }
 
 async function fetchLeagueHasData(leagueId) {
@@ -465,7 +1270,15 @@ async function fetchLeagueHasData(leagueId) {
     return false;
   }
   const matches = await fetchJson(`/matches/${tournamentId}`);
-  return Array.isArray(matches) && matches.length > 0;
+  if (!Array.isArray(matches) || !matches.length) {
+    return false;
+  }
+
+  const now = Date.now();
+  return matches.some((match) => {
+    const startTime = normalizeStartTime(getMatchStartValue(match));
+    return startTime && startTime >= now - RECENT_MATCH_WINDOW_MS;
+  });
 }
 
 async function mapWithConcurrency(items, limit, worker) {
@@ -551,18 +1364,47 @@ function buildMatchCard(match, leagueId, isLive) {
     ? []
     : isLive
       ? getLiveLinks(leagueId)
-      : [getVodLink(match, leagueId)];
+      : getVodLinks(match, leagueId);
   const watchMarkup = watchLinks.length
     ? `
         <div class="match-actions">
           ${watchLinks
-            .map(
-              (link) => `
-                <a class="match-link" href="${link.url}" target="_blank" rel="noopener noreferrer">
+            .map((link) => {
+              const lckAttrs = link.lckMatchup
+                ? ` data-lck-vod="pending" data-lck-matchup="${encodeURIComponent(
+                    link.lckMatchup
+                  )}"`
+                : "";
+              const lckSingleAttrs = link.lckMatchupSingle
+                ? ` data-lck-matchup-single="${encodeURIComponent(link.lckMatchupSingle)}"`
+                : "";
+              const lckStartAttr = Number.isFinite(link.lckStartTime)
+                ? ` data-lck-start-time="${link.lckStartTime}"`
+                : "";
+              const lckBestOfAttr = Number.isFinite(link.lckBestOf)
+                ? ` data-lck-best-of="${link.lckBestOf}"`
+                : "";
+              const lckTeamAIdAttr = link.lckTeamAId
+                ? ` data-lck-team-a-id="${encodeURIComponent(link.lckTeamAId)}"`
+                : "";
+              const lckTeamBIdAttr = link.lckTeamBId
+                ? ` data-lck-team-b-id="${encodeURIComponent(link.lckTeamBId)}"`
+                : "";
+              const lckTeamANameAttr = link.lckTeamAName
+                ? ` data-lck-team-a-name="${encodeURIComponent(link.lckTeamAName)}"`
+                : "";
+              const lckTeamBNameAttr = link.lckTeamBName
+                ? ` data-lck-team-b-name="${encodeURIComponent(link.lckTeamBName)}"`
+                : "";
+              const lckLiveAttrs = link.lckLiveStart
+                ? ' data-lck-live-start="pending"'
+                : "";
+              return `
+                <a class="match-link" href="${link.url}" target="_blank" rel="noopener noreferrer"${lckAttrs}${lckSingleAttrs}${lckStartAttr}${lckBestOfAttr}${lckTeamAIdAttr}${lckTeamBIdAttr}${lckTeamANameAttr}${lckTeamBNameAttr}${lckLiveAttrs}>
                   ${link.label}
                 </a>
-              `
-            )
+              `;
+            })
             .join("")}
         </div>
       `
@@ -788,6 +1630,9 @@ function renderSchedule() {
     statusParts.push(`${upcoming.length} upcoming`);
   }
   setStatus(`Showing ${statusParts.join(" · ")} matches.`);
+  hydrateLckVodLinks(matchesEl);
+  hydrateLckVodLinks(previousEl);
+  hydrateLckLiveStartLinks(matchesEl);
 }
 
 function renderStandings() {
@@ -866,7 +1711,7 @@ function setPreviousToggleLabel(count) {
   }
 
   if (count === 0) {
-    previousToggle.textContent = "No previous matches";
+    previousToggle.textContent = "";
     previousToggle.disabled = true;
     return;
   }
@@ -878,6 +1723,8 @@ function setPreviousToggleLabel(count) {
 }
 
 async function loadMatches(leagueId) {
+  await refreshCaedrelStatus();
+  setLoading(true);
   try {
     setStatus("Loading tournament...");
 
@@ -913,6 +1760,8 @@ async function loadMatches(leagueId) {
     console.error(error);
     renderEmptyActiveView("Could not load schedule. Please try again later.");
     setStatus("");
+  } finally {
+    setLoading(false);
   }
 }
 
@@ -961,6 +1810,147 @@ function storeLeagueId(leagueId) {
   }
 }
 
+function getPreferredLeagues() {
+  try {
+    const raw = localStorage.getItem(LEAGUE_PREFERENCES_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function setPreferredLeagues(leagueIds) {
+  try {
+    localStorage.setItem(LEAGUE_PREFERENCES_KEY, JSON.stringify(leagueIds));
+  } catch (error) {
+    console.warn("Unable to store preferred leagues.", error);
+  }
+}
+
+function getLeagueCatalog() {
+  try {
+    const raw = localStorage.getItem(LEAGUE_CATALOG_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function setLeagueCatalog(leagues) {
+  try {
+    const slim = leagues.map((league) => ({
+      leagueId: league.leagueId,
+      leagueName: league.leagueName,
+    }));
+    localStorage.setItem(LEAGUE_CATALOG_KEY, JSON.stringify(slim));
+  } catch (error) {
+    console.warn("Unable to store league catalog.", error);
+  }
+}
+
+function populateLeagueDatalist(leagues) {
+  if (!leagueOptionsList) {
+    return;
+  }
+
+  leagueOptionsList.innerHTML = "";
+  leagues
+    .filter((league) => league?.leagueName)
+    .sort((a, b) => (a.leagueName || "").localeCompare(b.leagueName || ""))
+    .forEach((league) => {
+      const option = document.createElement("option");
+      option.value = league.leagueName;
+      leagueOptionsList.appendChild(option);
+    });
+}
+
+function updateLeagueDatalist(searchValue) {
+  const needle = normalizeLeagueSearch(searchValue);
+  if (needle.length < 2) {
+    populateLeagueDatalist(state.leagues);
+    return;
+  }
+
+  const matches = state.leagueCatalog.filter((league) =>
+    normalizeLeagueSearch(league.leagueName).includes(needle)
+  );
+  populateLeagueDatalist(matches);
+}
+
+function normalizeLeagueSearch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function findLeagueBySearch(leagues, searchValue) {
+  const needle = normalizeLeagueSearch(searchValue);
+  if (!needle) {
+    return null;
+  }
+
+  const exact = leagues.find(
+    (league) => normalizeLeagueSearch(league.leagueName) === needle
+  );
+  if (exact) {
+    return exact;
+  }
+
+  return (
+    leagues.find((league) =>
+      normalizeLeagueSearch(league.leagueName).includes(needle)
+    ) || null
+  );
+}
+
+function orderLeaguesByPreference(leagues, preferredIds) {
+  if (!preferredIds.length) {
+    return leagues;
+  }
+
+  const preferred = leagues.filter((league) => preferredIds.includes(league.leagueId));
+  const remaining = leagues.filter((league) => !preferredIds.includes(league.leagueId));
+  return [
+    ...preferred,
+    ...remaining.sort((a, b) => (a.leagueName || "").localeCompare(b.leagueName || "")),
+  ];
+}
+
+function buildLeagueOptionsList(leagues) {
+  const sortedByPriority = [...leagues].sort((a, b) => {
+    const weightA = getLeagueSortWeight(a);
+    const weightB = getLeagueSortWeight(b);
+    if (weightA !== weightB) {
+      return weightA - weightB;
+    }
+    return (a.leagueName || "").localeCompare(b.leagueName || "");
+  });
+  const preferredLeagues = getPreferredLeagues();
+  const leaguesToShow = orderLeaguesByPreference(sortedByPriority, preferredLeagues);
+  populateLeagueOptions(leaguesToShow);
+  return leaguesToShow;
+}
+
+function filterLeaguesByData(leagues, dataCache) {
+  if (!dataCache) {
+    return [];
+  }
+  return leagues.filter((league) => dataCache[league.leagueId] === true);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function getLeagueDataCache() {
   try {
     const raw = localStorage.getItem(LEAGUE_DATA_CACHE_KEY);
@@ -989,6 +1979,167 @@ function setLeagueDataCache(data) {
   } catch (error) {
     console.warn("Unable to store league data cache.", error);
   }
+}
+
+function setLeagueBuckets(buckets) {
+  try {
+    const payload = {
+      withData: Array.from(buckets.withData),
+      likelyNoData: Array.from(buckets.likelyNoData),
+      unlikelyNoData: Array.from(buckets.unlikelyNoData),
+    };
+    localStorage.setItem(LEAGUE_BUCKETS_KEY, JSON.stringify(payload));
+  } catch (error) {
+    console.warn("Unable to store league buckets.", error);
+  }
+}
+
+function updateLeagueBuckets(dataCache) {
+  const buckets = {
+    withData: new Set(),
+    likelyNoData: new Set(),
+    unlikelyNoData: new Set(),
+  };
+
+  state.leagueCatalog.forEach((league) => {
+    const hasData = dataCache[league.leagueId];
+    if (hasData === true) {
+      buckets.withData.add(league.leagueId);
+    } else if (hasData === false) {
+      if (LIKELY_LEAGUE_IDS.includes(league.leagueId)) {
+        buckets.likelyNoData.add(league.leagueId);
+      } else {
+        buckets.unlikelyNoData.add(league.leagueId);
+      }
+    }
+  });
+
+  state.leagueBuckets = buckets;
+  setLeagueBuckets(buckets);
+}
+
+function sortLeaguesForCheck(leagues) {
+  return [...leagues].sort((a, b) => {
+    const bucketA = MAIN_LEAGUE_IDS.includes(a.leagueId)
+      ? 0
+      : LIKELY_LEAGUE_IDS.includes(a.leagueId)
+        ? 1
+        : 2;
+    const bucketB = MAIN_LEAGUE_IDS.includes(b.leagueId)
+      ? 0
+      : LIKELY_LEAGUE_IDS.includes(b.leagueId)
+        ? 1
+        : 2;
+    if (bucketA !== bucketB) {
+      return bucketA - bucketB;
+    }
+    return (a.leagueName || "").localeCompare(b.leagueName || "");
+  });
+}
+
+async function refreshLeaguesWithData(leagues) {
+  if (!leagues.length || leagueDataRefreshInFlight) {
+    return null;
+  }
+
+  leagueDataRefreshInFlight = true;
+  try {
+    const cached = getLeagueDataCache();
+    const dataCache = cached?.data ? { ...cached.data } : {};
+    const toCheck = sortLeaguesForCheck(leagues).filter(
+      (league) =>
+        dataCache[league.leagueId] === undefined || dataCache[league.leagueId] === null
+    );
+
+    if (toCheck.length) {
+      const limitedChecks = toCheck.slice(0, LEAGUE_REFRESH_MAX_CHECKS);
+      for (const league of limitedChecks) {
+        try {
+          const hasData = await fetchLeagueHasData(league.leagueId);
+          dataCache[league.leagueId] = hasData;
+        } catch (error) {
+          dataCache[league.leagueId] = null;
+        }
+        await sleep(LEAGUE_REFRESH_STEP_DELAY_MS);
+      }
+      setLeagueDataCache(dataCache);
+    }
+    updateLeagueBuckets(dataCache);
+
+    return {
+      filtered: filterLeaguesByData(leagues, dataCache),
+      dataCache,
+    };
+  } finally {
+    leagueDataRefreshInFlight = false;
+  }
+}
+
+function scheduleLeagueDataRefresh() {
+  if (leagueDataRefreshScheduled) {
+    return;
+  }
+
+  leagueDataRefreshScheduled = true;
+  const runRefresh = () => {
+    refreshLeaguesWithData(state.leagueCatalog)
+      .then((result) => {
+        if (!result) {
+          return;
+        }
+
+        const { filtered } = result;
+        if (filtered.length === state.leagues.length && filtered.length > 0) {
+          return;
+        }
+
+        state.leagues = filtered;
+        state.leaguesById = new Map(
+          filtered.map((league) => [league.leagueId, league.leagueName])
+        );
+  const leaguesToShow = buildLeagueOptionsList(filtered);
+
+  if (!leaguesToShow.length) {
+          matchesEl.innerHTML = "";
+          setPreviousToggleLabel(0);
+          setStatus(LEAGUE_CHECKING_MESSAGE);
+          return;
+        }
+
+        const currentSelection = leagueSelect.value;
+        if (!filtered.some((league) => league.leagueId === currentSelection)) {
+          const defaultLeague = pickDefaultLeague(leaguesToShow);
+          leagueSelect.value = defaultLeague.leagueId;
+          storeLeagueId(defaultLeague.leagueId);
+          loadMatches(defaultLeague.leagueId);
+        }
+        updateLeagueDatalist(leagueFilter?.value || "");
+      })
+      .catch((error) => {
+        console.warn("Unable to refresh league data availability.", error);
+      })
+      .finally(() => {
+        leagueDataRefreshScheduled = false;
+      });
+  };
+
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(runRefresh, { timeout: LEAGUE_REFRESH_DELAY_MS });
+  } else {
+    setTimeout(runRefresh, LEAGUE_REFRESH_DELAY_MS);
+  }
+}
+
+function startLeagueDataRefresh() {
+  if (leagueRefreshInterval) {
+    return;
+  }
+  leagueRefreshInterval = setInterval(() => {
+    if (document.hidden) {
+      return;
+    }
+    scheduleLeagueDataRefresh();
+  }, LEAGUE_REFRESH_INTERVAL_MS);
 }
 
 function pickDefaultLeague(leagues) {
@@ -1033,7 +2184,67 @@ async function init() {
     });
   }
 
+  if (saveLeagueButton && leagueFilter) {
+    leagueFilter.addEventListener("input", () => {
+      updateLeagueDatalist(leagueFilter.value);
+    });
+
+    saveLeagueButton.addEventListener("click", () => {
+      const match = findLeagueBySearch(state.leagueCatalog, leagueFilter.value);
+      if (!match) {
+        setStatus("No matching league found.");
+        return;
+      }
+
+      if (!state.leagues.some((league) => league.leagueId === match.leagueId)) {
+        state.leagues = [...state.leagues, match];
+        state.leaguesById.set(match.leagueId, match.leagueName);
+      }
+
+      const current = getPreferredLeagues();
+      const updated = current.includes(match.leagueId)
+        ? current
+        : [...current, match.leagueId];
+      setPreferredLeagues(updated);
+      buildLeagueOptionsList(state.leagues);
+
+      leagueSelect.value = match.leagueId;
+      storeLeagueId(match.leagueId);
+      setStatus(`Saved ${match.leagueName}. Checking data...`);
+      refreshLeaguesWithData([match]).then((result) => {
+        if (!result) {
+          return;
+        }
+        state.leagues = result.filtered;
+        state.leaguesById = new Map(
+          result.filtered.map((league) => [league.leagueId, league.leagueName])
+        );
+        const leaguesToShow = buildLeagueOptionsList(result.filtered);
+        if (!leaguesToShow.length) {
+          renderEmpty(matchesEl, "No leagues with match data are available.");
+          setStatus("No leagues with match data are available.");
+          return;
+        }
+        if (result.filtered.some((league) => league.leagueId === match.leagueId)) {
+          loadMatches(match.leagueId);
+          setStatus(`Saved ${match.leagueName}.`);
+        } else {
+          setStatus(`No match data found for ${match.leagueName} yet.`);
+        }
+      });
+      scheduleLeagueDataRefresh();
+    });
+  }
+
+  const cachedCatalog = getLeagueCatalog();
+  if (cachedCatalog.length) {
+    state.leagueCatalog = cachedCatalog;
+    updateLeagueDatalist(leagueFilter?.value || "");
+  }
+
+  setLoading(true);
   try {
+    await refreshCaedrelStatus();
     setStatus("Loading leagues...");
 
     // Data flow: fetch league list once, then load matches per selection.
@@ -1046,50 +2257,53 @@ async function init() {
       return;
     }
 
-    setStatus("Checking leagues with data...");
-    const leaguesWithData = await filterLeaguesWithData(leagues);
-
-    if (!leaguesWithData.length) {
-      renderEmpty(matchesEl, "No leagues with match data are available.");
-      setPreviousToggleLabel(0);
-      setStatus("");
-      return;
-    }
-
-    state.leagues = leaguesWithData;
-    state.leaguesById = new Map(
-      leaguesWithData.map((league) => [league.leagueId, league.leagueName])
+    const primaryLeagues = leagues.filter((league) =>
+      MAIN_LEAGUE_IDS.includes(league.leagueId)
     );
+    const leaguesToUse = primaryLeagues.length ? primaryLeagues : leagues;
 
-    const leaguesToShow = [...leaguesWithData].sort((a, b) => {
-      const weightA = getLeagueSortWeight(a);
-      const weightB = getLeagueSortWeight(b);
-      if (weightA !== weightB) {
-        return weightA - weightB;
-      }
-      return (a.leagueName || "").localeCompare(b.leagueName || "");
-    });
-    populateLeagueOptions(leaguesToShow);
+    const filteredLeagues = filterLeaguesByData(
+      leaguesToUse,
+      getLeagueDataCache()?.data
+    );
+    state.leagues = filteredLeagues;
+    state.leagueCatalog = leagues;
+    state.leaguesById = new Map(
+      filteredLeagues.map((league) => [league.leagueId, league.leagueName])
+    );
+    setLeagueCatalog(leagues);
+    updateLeagueDatalist(leagueFilter?.value || "");
 
-    const defaultLeague = pickDefaultLeague(leaguesToShow);
-    leagueSelect.value = defaultLeague.leagueId;
-    storeLeagueId(defaultLeague.leagueId);
+    const leaguesToShow = buildLeagueOptionsList(filteredLeagues);
+    if (!leaguesToShow.length) {
+      matchesEl.innerHTML = "";
+      setPreviousToggleLabel(0);
+      setStatus(LEAGUE_CHECKING_MESSAGE);
+    } else {
+      const defaultLeague = pickDefaultLeague(leaguesToShow);
+      leagueSelect.value = defaultLeague.leagueId;
+      storeLeagueId(defaultLeague.leagueId);
 
-    setStatus("Loading teams...");
-    await loadTeams();
+      setStatus("Loading teams...");
+      await loadTeams();
 
-    await loadMatches(defaultLeague.leagueId);
+      await loadMatches(defaultLeague.leagueId);
+    }
 
     leagueSelect.addEventListener("change", () => {
       const selectedLeagueId = leagueSelect.value;
       storeLeagueId(selectedLeagueId);
       loadMatches(selectedLeagueId);
     });
+    scheduleLeagueDataRefresh();
+    startLeagueDataRefresh();
 
   } catch (error) {
     console.error(error);
     renderEmptyActiveView("Could not load leagues. Please try again later.");
     setStatus("");
+  } finally {
+    setLoading(false);
   }
 }
 

@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LoL Esports Schedule</title>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -22,6 +23,23 @@
         <div class="controls">
           <label for="leagueSelect">League</label>
           <select id="leagueSelect"></select>
+          <div class="league-customize">
+            <label for="leagueFilter">Find league</label>
+            <div class="league-filter-row">
+              <input
+                id="leagueFilter"
+                type="text"
+                placeholder="Type a league name"
+                autocomplete="off"
+                list="leagueOptions"
+              />
+              <button class="ghost-button" id="saveLeague" type="button">
+                Save
+              </button>
+            </div>
+            <datalist id="leagueOptions"></datalist>
+            <p class="league-hint">Saved leagues show first in the list.</p>
+          </div>
           <div class="view-toggle" role="group" aria-label="View toggle">
             <button class="view-button is-active" data-view="schedule" type="button">
               Schedule
@@ -32,6 +50,16 @@
           </div>
         </div>
       </header>
+
+      <div
+        class="loading-indicator"
+        id="loadingIndicator"
+        aria-live="polite"
+        aria-hidden="true"
+      >
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span class="loading-label">Scraping</span>
+      </div>
 
       <section class="status" id="status"></section>
 
@@ -46,6 +74,7 @@
       <section class="table" id="table"></section>
     </main>
 
+    <script src="config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

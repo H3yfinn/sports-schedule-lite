@@ -53,7 +53,7 @@ async function run() {
     const app = await fetchText("/app.js");
     assert(app.status === 200, "Expected app.js to return 200.");
     assert(app.body.includes("getLiveLinks"), "Expected live link helper in app.js.");
-    assert(app.body.includes("getVodLink"), "Expected VOD link helper in app.js.");
+    assert(app.body.includes("getVodLinks"), "Expected VOD link helper in app.js.");
 
     const logo = await fetchText("/assets/logos/T1.svg");
     assert(logo.status === 200, "Expected local LCK logo asset to return 200.");
