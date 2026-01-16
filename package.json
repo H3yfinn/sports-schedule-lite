@@ -1,0 +1,10 @@
+{
+  "name": "sports-schedule-lite",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static LoL esports schedule viewer",
+  "scripts": {
+    "dev": "npx http-server -c-1 -p 5173 -o",
+    "start": "npx http-server -c-1 -p 5173 -o"
+  }
+}

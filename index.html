@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LoL Esports Schedule</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Source+Sans+3:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div>
+          <h1>LoL Esports Schedule</h1>
+          <p class="subtitle">Upcoming matches in your local time.</p>
+        </div>
+        <div class="controls">
+          <label for="leagueSelect">League</label>
+          <select id="leagueSelect"></select>
+          <div class="view-toggle" role="group" aria-label="View toggle">
+            <button class="view-button is-active" data-view="schedule" type="button">
+              Schedule
+            </button>
+            <button class="view-button" data-view="table" type="button">
+              League Table
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <section class="status" id="status"></section>
+
+      <div class="toolbar">
+        <button class="ghost-button" id="previousToggle" type="button">
+          Show previous matches
+        </button>
+      </div>
+
+      <section class="previous" id="previous"></section>
+      <section class="matches" id="matches"></section>
+      <section class="table" id="table"></section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
