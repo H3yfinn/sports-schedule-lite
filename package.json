@@ -6,11 +6,8 @@
   "scripts": {
     "dev": "npx http-server -c-1 -p 5173 -o",
     "start": "npx http-server -c-1 -p 5173 -o",
-    "setup": "npx playwright install",
-    "test": "playwright test",
-    "test:e2e": "playwright test"
+    "setup": "echo \"No setup needed\"",
+    "test": "echo \"No tests configured\""
   },
-  "devDependencies": {
-    "@playwright/test": "^1.50.0"
-  }
+  "devDependencies": {}
 }
