@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "npx http-server -c-1 -p 5173 -o",
     "start": "npx http-server -c-1 -p 5173 -o",
-    "test": "node tests/smoke.test.mjs",
-    "test:e2e": "node tests/smoke.test.mjs"
+    "test": "playwright test",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
   }
 }
