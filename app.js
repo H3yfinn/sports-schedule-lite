@@ -67,7 +67,33 @@ const TEAM_BRAND_MAP = {
   RNG: { color: "#D40000" },
   IG: { color: "#0B1F2A" },
 };
-const CORS_PROXY = "https://corsproxy.io/?";
+const CORS_PROXIES = [
+  "https://corsproxy.io/?",
+  "https://cors.isomorphic-git.org/",
+];
+const RESPONSE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const FALLBACK_DATA = {
+  "/leagues": [
+    { leagueId: "LCK", leagueName: "LCK", isOfficial: true, level: "primary" },
+    { leagueId: "LEC", leagueName: "LEC", isOfficial: true, level: "primary" },
+    { leagueId: "LPL", leagueName: "LPL", isOfficial: true, level: "primary" },
+    { leagueId: "LCS", leagueName: "LCS", isOfficial: true, level: "primary" },
+    { leagueId: "MSI", leagueName: "MSI", isOfficial: true, level: "primary" },
+    { leagueId: "WCS", leagueName: "Worlds", isOfficial: true, level: "primary" },
+  ],
+  "/teams": [
+    { teamId: "T1", name: "T1" },
+    { teamId: "GEN", name: "Gen.G" },
+    { teamId: "DK", name: "Dplus KIA" },
+    { teamId: "HLE", name: "Hanwha Life Esports" },
+    { teamId: "KT", name: "KT Rolster" },
+    { teamId: "DRX", name: "DRX" },
+    { teamId: "KDF", name: "Kwangdong Freecs" },
+    { teamId: "NS", name: "Nongshim RedForce" },
+    { teamId: "BRO", name: "OKSavingsBank BRION" },
+    { teamId: "FOX", name: "FearX" },
+  ],
+};
 const LIVE_WINDOW_MS = 3 * 60 * 60 * 1000;
 const PREVIOUS_LIMIT = 10;
 const LEAGUE_STORAGE_KEY = "lolScheduleLeagueId";
@@ -209,24 +235,64 @@ function getTeamBrand(teamId) {
   };
 }
 
+function getCachedResponse(path) {
+  try {
+    const raw = localStorage.getItem(`lolScheduleCache:${path}`);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed?.timestamp || parsed?.data === undefined) {
+      return null;
+    }
+    if (Date.now() - parsed.timestamp > RESPONSE_CACHE_TTL_MS) {
+      return null;
+    }
+    return parsed.data;
+  } catch (error) {
+    return null;
+  }
+}
+
+function setCachedResponse(path, data) {
+  try {
+    localStorage.setItem(
+      `lolScheduleCache:${path}`,
+      JSON.stringify({ timestamp: Date.now(), data })
+    );
+  } catch (error) {
+    console.warn("Unable to store response cache.", error);
+  }
+}
+
 async function fetchJson(path) {
   const url = `${API_BASE}${path}`;
+  const urlsToTry = [url, ...CORS_PROXIES.map((proxy) => `${proxy}${encodeURIComponent(url)}`)];
 
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
+  for (const targetUrl of urlsToTry) {
+    try {
+      const response = await fetch(targetUrl);
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+      const data = await response.json();
+      setCachedResponse(path, data);
+      return data;
+    } catch (error) {
+      // Continue to the next URL.
     }
-    return response.json();
-  } catch (error) {
-    // Fallback for browsers that block the API due to missing CORS headers.
-    const proxiedUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-    const response = await fetch(proxiedUrl);
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
-    }
-    return response.json();
   }
+
+  const cached = getCachedResponse(path);
+  if (cached !== null) {
+    return cached;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(FALLBACK_DATA, path)) {
+    return FALLBACK_DATA[path];
+  }
+
+  throw new Error(`All requests failed for ${path}`);
 }
 
 function getLiveLinks(leagueId) {
@@ -311,13 +377,16 @@ async function filterLeaguesWithData(leagues) {
         const hasData = await fetchLeagueHasData(league.leagueId);
         dataCache[league.leagueId] = hasData;
       } catch (error) {
-        dataCache[league.leagueId] = false;
+        dataCache[league.leagueId] =
+          PRIORITY_EVENT_IDS.includes(league.leagueId) ||
+          MAJOR_LEAGUE_IDS.includes(league.leagueId);
       }
     });
     setLeagueDataCache(dataCache);
   }
 
-  return leagues.filter((league) => dataCache[league.leagueId]);
+  const filtered = leagues.filter((league) => dataCache[league.leagueId]);
+  return filtered.length ? filtered : leagues;
 }
 
 async function loadTeams() {
