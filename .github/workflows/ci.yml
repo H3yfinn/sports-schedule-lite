@@ -17,9 +17,5 @@ jobs:
           node-version: "20"
       - name: Install dependencies
         run: npm install
-      - name: Ensure Playwright is executable
-        run: chmod +x node_modules/.bin/playwright
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      - name: Run Playwright tests
+      - name: Run tests
         run: npm test
