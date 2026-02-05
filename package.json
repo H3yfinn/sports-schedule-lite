@@ -7,7 +7,7 @@
     "dev": "npx http-server -c-1 -p 5173 -o",
     "start": "npx http-server -c-1 -p 5173 -o",
     "setup": "echo \"No setup needed\"",
-    "test": "echo \"No tests configured\""
+    "test": "node tests/smoke.cjs"
   },
   "devDependencies": {}
 }

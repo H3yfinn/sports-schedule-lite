@@ -1,7 +1,5 @@
-const API_BASE = "https://api.lol-esports.mckernant1.com";
 const APP_CONFIG = window.APP_CONFIG || {};
-const TWITCH_CLIENT_ID = APP_CONFIG.twitchClientId || "";
-const TWITCH_ACCESS_TOKEN = APP_CONFIG.twitchAccessToken || "";
+const API_BASE = APP_CONFIG.apiBaseUrl || "https://api.lol-esports.mckernant1.com";
 const TWITCH_STREAMER_LOGIN = APP_CONFIG.twitchStreamerLogin || "caedrel";
 const PROXY_BASE_URL = APP_CONFIG.proxyBaseUrl || "";
 const PRIORITY_EVENT_IDS = ["MSI", "WCS", "FST", "FS"];
@@ -149,9 +147,6 @@ const LIKELY_LEAGUE_IDS = [
   "VCS",
   "VL",
 ];
-const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
-const YOUTUBE_API_KEY = APP_CONFIG.youtubeApiKey || "";
-const YOUTUBE_API_KEY_STORAGE_KEY = "lolScheduleYouTubeApiKey";
 const LCK_GLOBAL_HANDLE = "@LCKglobal";
 const LCK_GLOBAL_CHANNEL_URL = "https://www.youtube.com/@LCKglobal";
 const LCK_ENGLISH_HANDLE = "@LCK_English";
@@ -259,6 +254,7 @@ const CORS_PROXIES = [
   "https://api.allorigins.win/get?url=",
 ];
 const RESPONSE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const SCORE_VISIBILITY_STORAGE_KEY = "lolScheduleShowScores";
 const FALLBACK_DATA = {
   "/leagues": [
     { leagueId: "LCK", leagueName: "LCK", isOfficial: true, level: "primary" },
@@ -317,6 +313,7 @@ const LEAGUE_CATALOG_KEY = "lolScheduleLeagueCatalog";
 const LEAGUE_DATA_CACHE_KEY = "lolScheduleLeagueDataCache:v3";
 const LEAGUE_DATA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const TWITCH_STATUS_TTL_MS = 2 * 60 * 1000;
+const TWITCH_STATUS_CACHE_KEY = "lolScheduleTwitchStatus";
 const LEAGUE_REFRESH_DELAY_MS = 1500;
 const LEAGUE_REFRESH_STEP_DELAY_MS = 1000;
 const LEAGUE_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
@@ -325,7 +322,6 @@ const LEAGUE_BUCKETS_KEY = "lolScheduleLeagueBuckets";
 const LEAGUE_CHECKING_MESSAGE = "Checking leagues for match data...";
 
 const lckVodCache = new Map();
-let lckChannelIdKey = null;
 let lckChannelIdPromise = null;
 let lckChannelIdValue = null;
 let leagueDataRefreshScheduled = false;
@@ -333,6 +329,7 @@ let leagueDataRefreshInFlight = false;
 let leagueRefreshInterval = null;
 const lckLiveStartCache = new Map();
 const lckLiveStartPromises = new Map();
+const responseRefreshPromises = new Map();
 
 const state = {
   leagues: [],
@@ -344,8 +341,8 @@ const state = {
   currentTournamentId: null,
   view: "schedule",
   showPrevious: false,
+  showScores: false,
   caedrelLive: null,
-  lastTwitchCheck: 0,
   leagueBuckets: {
     withData: new Set(),
     likelyNoData: new Set(),
@@ -359,6 +356,7 @@ const matchesEl = document.getElementById("matches");
 const tableEl = document.getElementById("table");
 const previousEl = document.getElementById("previous");
 const previousToggle = document.getElementById("previousToggle");
+const scoresToggle = document.getElementById("scoresToggle");
 const leagueFilter = document.getElementById("leagueFilter");
 const saveLeagueButton = document.getElementById("saveLeague");
 const leagueOptionsList = document.getElementById("leagueOptions");
@@ -638,10 +636,7 @@ function getCachedResponse(path) {
     if (!parsed?.timestamp || parsed?.data === undefined) {
       return null;
     }
-    if (Date.now() - parsed.timestamp > RESPONSE_CACHE_TTL_MS) {
-      return null;
-    }
-    return parsed.data;
+    return parsed;
   } catch (error) {
     return null;
   }
@@ -658,16 +653,8 @@ function setCachedResponse(path, data) {
   }
 }
 
-function getYouTubeApiKey() {
-  try {
-    const stored = localStorage.getItem(YOUTUBE_API_KEY_STORAGE_KEY);
-    if (stored) {
-      return stored;
-    }
-  } catch (error) {
-    // Ignore storage errors and fall back to the inline key.
-  }
-  return YOUTUBE_API_KEY;
+function isCachedResponseFresh(cached) {
+  return Date.now() - cached.timestamp <= RESPONSE_CACHE_TTL_MS;
 }
 
 function getProxyBaseUrl() {
@@ -678,41 +665,26 @@ function getProxyBaseUrl() {
 }
 
 function hasYouTubeAccess() {
-  return Boolean(getProxyBaseUrl() || getYouTubeApiKey());
+  return Boolean(getProxyBaseUrl());
 }
 
 async function fetchYouTubeJson(endpoint, params) {
   try {
     const proxyBase = getProxyBaseUrl();
-    if (proxyBase) {
-      const url = new URL(`${proxyBase}/youtube`);
-      url.searchParams.set("endpoint", endpoint);
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== "") {
-          url.searchParams.set(key, String(value));
-        }
-      });
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        throw new Error(`YouTube proxy failed: ${response.status}`);
-      }
-      return await response.json();
-    }
-
-    const apiKey = getYouTubeApiKey();
-    if (!apiKey) {
+    if (!proxyBase) {
       return null;
     }
-    const url = new URL(`${YOUTUBE_API_BASE}/${endpoint}`);
+
+    const url = new URL(`${proxyBase}/youtube`);
+    url.searchParams.set("endpoint", endpoint);
     Object.entries(params).forEach(([key, value]) => {
       if (value !== null && value !== undefined && value !== "") {
         url.searchParams.set(key, String(value));
       }
     });
-    url.searchParams.set("key", apiKey);
     const response = await fetch(url.toString());
     if (!response.ok) {
-      throw new Error(`YouTube request failed: ${response.status}`);
+      throw new Error(`YouTube proxy failed: ${response.status}`);
     }
     return await response.json();
   } catch (error) {
@@ -725,15 +697,12 @@ async function fetchLckGlobalChannelId() {
   if (!hasYouTubeAccess()) {
     return null;
   }
-  const apiKey = getYouTubeApiKey();
-  if (lckChannelIdValue && lckChannelIdKey === apiKey) {
+  if (lckChannelIdValue) {
     return lckChannelIdValue;
   }
-  if (lckChannelIdPromise && lckChannelIdKey === apiKey) {
+  if (lckChannelIdPromise) {
     return lckChannelIdPromise;
   }
-
-  lckChannelIdKey = apiKey;
   lckChannelIdPromise = (async () => {
     const data = await fetchYouTubeJson("channels", {
       part: "id",
@@ -952,7 +921,7 @@ async function fetchLckLiveStartUrl(matchupString) {
   const promise = (async () => {
     const liveVideo = await fetchLckLiveVideo(matchupString);
     const videoId = liveVideo?.id?.videoId;
-    const url = videoId ? `https://www.youtube.com/watch?v=${videoId}&t=0s` : null;
+    const url = videoId ? `https://www.youtube.com/watch?v=${videoId}&t=1s&start=1` : null;
     if (url) {
       lckLiveStartCache.set(cacheKey, url);
     }
@@ -1339,6 +1308,29 @@ function shouldBypassDirectApi() {
 }
 
 async function fetchJson(path) {
+  const cached = getCachedResponse(path);
+  if (cached && isCachedResponseFresh(cached)) {
+    refreshCachedResponse(path);
+    return cached.data;
+  }
+
+  try {
+    const data = await fetchJsonLive(path);
+    return data;
+  } catch (error) {
+    if (cached) {
+      return cached.data;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(FALLBACK_DATA, path)) {
+      return FALLBACK_DATA[path];
+    }
+
+    throw error;
+  }
+}
+
+async function fetchJsonLive(path) {
   const url = `${API_BASE}${path}`;
   const proxyUrls = CORS_PROXIES.map((proxy) => `${proxy}${encodeURIComponent(url)}`);
   const urlsToTry = shouldBypassDirectApi() ? proxyUrls : [url, ...proxyUrls];
@@ -1360,16 +1352,16 @@ async function fetchJson(path) {
     }
   }
 
-  const cached = getCachedResponse(path);
-  if (cached !== null) {
-    return cached;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(FALLBACK_DATA, path)) {
-    return FALLBACK_DATA[path];
-  }
-
   throw new Error(`All requests failed for ${path}`);
+}
+
+function refreshCachedResponse(path) {
+  if (responseRefreshPromises.has(path)) {
+    return;
+  }
+  const promise = fetchJsonLive(path).catch(() => null);
+  responseRefreshPromises.set(path, promise);
+  promise.finally(() => responseRefreshPromises.delete(path));
 }
 
 function getLiveLinks(leagueId) {
@@ -1399,7 +1391,44 @@ function getLiveLinks(leagueId) {
   return links;
 }
 
+function getCachedTwitchStatus(allowStale = false) {
+  try {
+    const raw = localStorage.getItem(TWITCH_STATUS_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.isLive !== "boolean" || !parsed.timestamp) {
+      return null;
+    }
+    if (!allowStale && Date.now() - parsed.timestamp > TWITCH_STATUS_TTL_MS) {
+      return null;
+    }
+    return parsed;
+  } catch (error) {
+    return null;
+  }
+}
+
+function setCachedTwitchStatus(isLive) {
+  try {
+    localStorage.setItem(
+      TWITCH_STATUS_CACHE_KEY,
+      JSON.stringify({ isLive: Boolean(isLive), timestamp: Date.now() })
+    );
+  } catch (error) {
+    console.warn("Unable to store Twitch status cache.", error);
+  }
+}
+
 async function refreshCaedrelStatus() {
+  const cachedStatus = getCachedTwitchStatus();
+  const fallbackStatus = cachedStatus || getCachedTwitchStatus(true);
+  if (cachedStatus) {
+    state.caedrelLive = cachedStatus.isLive;
+    return;
+  }
+
   const proxyBase = getProxyBaseUrl();
   if (proxyBase) {
     try {
@@ -1411,44 +1440,15 @@ async function refreshCaedrelStatus() {
       }
       const data = await response.json();
       state.caedrelLive = Array.isArray(data?.data) && data.data.length > 0;
+      setCachedTwitchStatus(state.caedrelLive);
       return;
     } catch (error) {
       console.warn("Unable to check Twitch live status via proxy.", error);
-      state.caedrelLive = null;
+      state.caedrelLive = fallbackStatus ? fallbackStatus.isLive : null;
       return;
     }
   }
-
-  if (!TWITCH_CLIENT_ID || !TWITCH_ACCESS_TOKEN) {
-    state.caedrelLive = null;
-    return;
-  }
-
-  const now = Date.now();
-  if (state.lastTwitchCheck && now - state.lastTwitchCheck < TWITCH_STATUS_TTL_MS) {
-    return;
-  }
-
-  state.lastTwitchCheck = now;
-  try {
-    const response = await fetch(
-      `https://api.twitch.tv/helix/streams?user_login=${TWITCH_STREAMER_LOGIN}`,
-      {
-        headers: {
-          "Client-ID": TWITCH_CLIENT_ID,
-          Authorization: `Bearer ${TWITCH_ACCESS_TOKEN}`,
-        },
-      }
-    );
-    if (!response.ok) {
-      throw new Error(`Twitch request failed: ${response.status}`);
-    }
-    const data = await response.json();
-    state.caedrelLive = Array.isArray(data?.data) && data.data.length > 0;
-  } catch (error) {
-    console.warn("Unable to check Twitch live status.", error);
-    state.caedrelLive = null;
-  }
+  state.caedrelLive = fallbackStatus ? fallbackStatus.isLive : null;
 }
 
 function getVodLinks(match, leagueId) {
@@ -1587,6 +1587,71 @@ async function loadTeams() {
   }
 }
 
+function getStoredScorePreference() {
+  try {
+    return localStorage.getItem(SCORE_VISIBILITY_STORAGE_KEY) === "true";
+  } catch (error) {
+    return false;
+  }
+}
+
+function storeScorePreference(showScores) {
+  try {
+    localStorage.setItem(SCORE_VISIBILITY_STORAGE_KEY, String(showScores));
+  } catch (error) {
+    console.warn("Unable to store score visibility.", error);
+  }
+}
+
+function getScoreLabel(match, blueId, redId) {
+  if (!state.showScores) {
+    return "";
+  }
+
+  const toScore = (value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+
+  const blueScore =
+    toScore(match.blueScore) ??
+    toScore(match.blueWins) ??
+    toScore(match.score?.blue) ??
+    toScore(match.score?.team1);
+  const redScore =
+    toScore(match.redScore) ??
+    toScore(match.redWins) ??
+    toScore(match.score?.red) ??
+    toScore(match.score?.team2);
+
+  if (blueScore !== null && redScore !== null) {
+    return `Score ${blueScore}-${redScore}`;
+  }
+
+  const winnerId = resolveWinnerId(match?.winner, blueId, redId);
+  if (winnerId) {
+    return `Winner ${resolveTeamName(winnerId)}`;
+  }
+
+  return "";
+}
+
+function resolveWinnerId(winnerValue, blueId, redId) {
+  if (!winnerValue) {
+    return null;
+  }
+  if (winnerValue === "BLUE") {
+    return blueId;
+  }
+  if (winnerValue === "RED") {
+    return redId;
+  }
+  if (winnerValue === blueId || winnerValue === redId) {
+    return winnerValue;
+  }
+  return null;
+}
+
 function buildMatchCard(match, leagueId, isLive) {
   const startTime = getMatchStartValue(match);
   const startTimestamp = normalizeStartTime(startTime);
@@ -1595,6 +1660,7 @@ function buildMatchCard(match, leagueId, isLive) {
   const redId = match.redTeamId || match.redTeam?.id;
   const teamA = resolveTeamName(blueId);
   const teamB = resolveTeamName(redId);
+  const scoreLabel = getScoreLabel(match, blueId, redId);
   const bestOf = match.bestOf ? `Bo${match.bestOf}` : "";
   const patch = match.patch ? `Patch ${match.patch}` : "";
   const badge = match.badge ? `<span class="live-badge">${match.badge}</span>` : "";
@@ -1662,6 +1728,8 @@ function buildMatchCard(match, leagueId, isLive) {
       `
     : "";
 
+  const metaParts = [scoreLabel, bestOf, patch].filter(Boolean);
+
   return `
     <article class="match match-themed" ${themeStyle}>
       <div class="match-header">
@@ -1674,7 +1742,7 @@ function buildMatchCard(match, leagueId, isLive) {
         <div class="match-time">${formatLocalTime(startTime)}</div>
       </div>
       <div class="match-meta">
-        ${[bestOf, patch].filter(Boolean).join(" · ")}
+        ${metaParts.join(" · ")}
       </div>
       ${watchMarkup}
     </article>
@@ -1974,9 +2042,20 @@ function setPreviousToggleLabel(count) {
     : `Show previous matches (${Math.min(count, PREVIOUS_LIMIT)})`;
 }
 
-async function loadMatches(leagueId) {
+function setScoresToggleLabel() {
+  if (!scoresToggle) {
+    return;
+  }
+
+  scoresToggle.textContent = state.showScores ? "Hide scores" : "Show scores";
+}
+
+async function loadMatches(leagueId, options = {}) {
+  const { showLoading = true } = options;
   await refreshCaedrelStatus();
-  setLoading(true);
+  if (showLoading) {
+    setLoading(true);
+  }
   try {
     setStatus("Loading tournament...");
 
@@ -2013,7 +2092,9 @@ async function loadMatches(leagueId) {
     renderEmptyActiveView("Could not load schedule. Please try again later.");
     setStatus("");
   } finally {
-    setLoading(false);
+    if (showLoading) {
+      setLoading(false);
+    }
   }
 }
 
@@ -2370,7 +2451,7 @@ function scheduleLeagueDataRefresh() {
           const defaultLeague = pickDefaultLeague(leaguesToShow);
           leagueSelect.value = defaultLeague.leagueId;
           storeLeagueId(defaultLeague.leagueId);
-          loadMatches(defaultLeague.leagueId);
+          loadMatches(defaultLeague.leagueId, { showLoading: false });
         }
         updateLeagueDatalist(leagueFilter?.value || "");
       })
@@ -2434,6 +2515,9 @@ async function init() {
   });
   setView(state.view);
 
+  state.showScores = getStoredScorePreference();
+  setScoresToggleLabel();
+
   if (previousToggle) {
     previousToggle.addEventListener("click", () => {
       state.showPrevious = !state.showPrevious;
@@ -2441,6 +2525,15 @@ async function init() {
       if (state.showPrevious) {
         previousEl.scrollIntoView({ behavior: "smooth", block: "start" });
       }
+    });
+  }
+
+  if (scoresToggle) {
+    scoresToggle.addEventListener("click", () => {
+      state.showScores = !state.showScores;
+      storeScorePreference(state.showScores);
+      setScoresToggleLabel();
+      renderCurrentView();
     });
   }
 

@@ -7,7 +7,8 @@ of the browser while still allowing the site to run on GitHub Pages.
 ## Why the Worker Matters
 
 The site requests YouTube and Twitch data from the worker (see `proxyBaseUrl`
-in `config.example.js`). The worker then calls the upstream APIs server-side.
+and `apiBaseUrl` in `config.example.js`). The worker then calls the upstream APIs
+server-side, including the LoL Esports API cache endpoint.
 
 Two common issues can break VOD links:
 
@@ -38,6 +39,18 @@ Required secrets:
 
 - `GET /youtube?endpoint=search|channels&...`
 - `GET /twitch-status?user_login=caedrel`
+- `GET /lol/*` (for example: `/lol/leagues`, `/lol/matches/{tournamentId}`)
+
+## Edge Cache (LoL API)
+
+The worker caches LoL API responses by path:
+
+- `/leagues` and `/teams` for 24 hours
+- `/most-recent-tournament/*` for 10 minutes
+- `/matches/*` for 5 minutes
+
+Set `apiBaseUrl` in `config.js` to your worker URL with the `/lol` prefix to
+enable edge caching.
 
 ## Request Flow (Diagram)
 

@@ -1,7 +1,5 @@
 window.APP_CONFIG = {
-  twitchClientId: "",
-  twitchAccessToken: "",
   twitchStreamerLogin: "caedrel",
-  youtubeApiKey: "",
-  proxyBaseUrl: "https://ol-schedule-proxy.finn-maunsell.workers.dev/",
+  proxyBaseUrl: "https://your-worker.your-subdomain.workers.dev",
+  apiBaseUrl: "https://your-worker.your-subdomain.workers.dev/lol",
 };
